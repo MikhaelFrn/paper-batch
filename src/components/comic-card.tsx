@@ -1,0 +1,79 @@
+import { Link } from "@tanstack/react-router";
+import { Bookmark, BookOpen, Heart, Star } from "lucide-react";
+import { ComicCover } from "./comic-cover";
+import { Badge } from "@/components/ui/badge";
+import type { Comic } from "@/lib/mock-data";
+import { cn } from "@/lib/utils";
+
+export function ComicCard({ comic, compact = false }: { comic: Comic; compact?: boolean }) {
+  return (
+    <Link
+      to="/comic/$id"
+      params={{ id: comic.id }}
+      className="group block space-y-2 outline-none"
+    >
+      <div className="relative">
+        <ComicCover comic={comic} size={compact ? "sm" : "md"} className="transition-transform duration-300 group-hover:-translate-y-1 group-hover:shadow-2xl" />
+        <div className="pointer-events-none absolute right-1.5 top-1.5 flex flex-col gap-1">
+          {comic.favorite && (
+            <span className="grid h-6 w-6 place-items-center rounded-full bg-black/70 text-primary">
+              <Heart className="h-3 w-3 fill-current" />
+            </span>
+          )}
+          {comic.wishlist && (
+            <span className="grid h-6 w-6 place-items-center rounded-full bg-black/70 text-gold">
+              <Bookmark className="h-3 w-3 fill-current" />
+            </span>
+          )}
+        </div>
+        <div className="pointer-events-none absolute left-1.5 bottom-1.5 flex gap-1">
+          {comic.owned && (
+            <Badge className="h-5 border-0 bg-emerald-600/90 px-1.5 text-[9px] text-white">OWNED</Badge>
+          )}
+          {comic.read && (
+            <Badge className="h-5 border-0 bg-accent/90 px-1.5 text-[9px]">READ</Badge>
+          )}
+        </div>
+      </div>
+      <div className="min-w-0">
+        <div className="truncate text-sm font-medium text-foreground group-hover:text-primary">
+          {comic.series} #{comic.issue}
+        </div>
+        <div className={cn("truncate text-xs text-muted-foreground", compact && "hidden")}>
+          {comic.writers[0]} · {new Date(comic.releaseDate).getFullYear()}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+export function PublisherBadge({ publisher }: { publisher: Comic["publisher"] }) {
+  const cls: Record<string, string> = {
+    Marvel: "bg-primary/15 text-primary border-primary/30",
+    DC: "bg-accent/15 text-accent border-accent/30",
+    Image: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+    "Dark Horse": "bg-zinc-500/15 text-zinc-300 border-zinc-500/30",
+    "Boom Studios": "bg-amber-500/15 text-amber-400 border-amber-500/30",
+    IDW: "bg-red-500/15 text-red-300 border-red-500/30",
+    Valiant: "bg-violet-500/15 text-violet-300 border-violet-500/30",
+  };
+  return (
+    <span className={cn("inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", cls[publisher])}>
+      {publisher}
+    </span>
+  );
+}
+
+export function RatingStars({ value }: { value?: number }) {
+  if (!value) return null;
+  return (
+    <span className="inline-flex items-center gap-1 text-xs text-gold">
+      <Star className="h-3.5 w-3.5 fill-current" />
+      {value.toFixed(1)}
+    </span>
+  );
+}
+
+export function ReadIcon() {
+  return <BookOpen className="h-3.5 w-3.5" />;
+}
