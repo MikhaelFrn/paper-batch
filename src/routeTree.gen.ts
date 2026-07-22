@@ -9,27 +9,352 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SignupRouteImport } from './routes/signup'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as ShellRouteImport } from './routes/_shell'
+import { Route as ShellIndexRouteImport } from './routes/_shell.index'
+import { Route as ShellWishlistRouteImport } from './routes/_shell.wishlist'
+import { Route as ShellSettingsRouteImport } from './routes/_shell.settings'
+import { Route as ShellSearchRouteImport } from './routes/_shell.search'
+import { Route as ShellReadingListRouteImport } from './routes/_shell.reading-list'
+import { Route as ShellProfileRouteImport } from './routes/_shell.profile'
+import { Route as ShellNewArrivalsRouteImport } from './routes/_shell.new-arrivals'
+import { Route as ShellListsRouteImport } from './routes/_shell.lists'
+import { Route as ShellInventoryRouteImport } from './routes/_shell.inventory'
+import { Route as ShellFavoritesRouteImport } from './routes/_shell.favorites'
+import { Route as ShellComicIdRouteImport } from './routes/_shell.comic.$id'
 
-export interface FileRoutesByFullPath {}
-export interface FileRoutesByTo {}
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShellRoute = ShellRouteImport.update({
+  id: '/_shell',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShellIndexRoute = ShellIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellWishlistRoute = ShellWishlistRouteImport.update({
+  id: '/wishlist',
+  path: '/wishlist',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellSettingsRoute = ShellSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellSearchRoute = ShellSearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellReadingListRoute = ShellReadingListRouteImport.update({
+  id: '/reading-list',
+  path: '/reading-list',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellProfileRoute = ShellProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellNewArrivalsRoute = ShellNewArrivalsRouteImport.update({
+  id: '/new-arrivals',
+  path: '/new-arrivals',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellListsRoute = ShellListsRouteImport.update({
+  id: '/lists',
+  path: '/lists',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellInventoryRoute = ShellInventoryRouteImport.update({
+  id: '/inventory',
+  path: '/inventory',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellFavoritesRoute = ShellFavoritesRouteImport.update({
+  id: '/favorites',
+  path: '/favorites',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellComicIdRoute = ShellComicIdRouteImport.update({
+  id: '/comic/$id',
+  path: '/comic/$id',
+  getParentRoute: () => ShellRoute,
+} as any)
+
+export interface FileRoutesByFullPath {
+  '/': typeof ShellIndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
+  '/favorites': typeof ShellFavoritesRoute
+  '/inventory': typeof ShellInventoryRoute
+  '/lists': typeof ShellListsRoute
+  '/new-arrivals': typeof ShellNewArrivalsRoute
+  '/profile': typeof ShellProfileRoute
+  '/reading-list': typeof ShellReadingListRoute
+  '/search': typeof ShellSearchRoute
+  '/settings': typeof ShellSettingsRoute
+  '/wishlist': typeof ShellWishlistRoute
+  '/comic/$id': typeof ShellComicIdRoute
+}
+export interface FileRoutesByTo {
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
+  '/favorites': typeof ShellFavoritesRoute
+  '/inventory': typeof ShellInventoryRoute
+  '/lists': typeof ShellListsRoute
+  '/new-arrivals': typeof ShellNewArrivalsRoute
+  '/profile': typeof ShellProfileRoute
+  '/reading-list': typeof ShellReadingListRoute
+  '/search': typeof ShellSearchRoute
+  '/settings': typeof ShellSettingsRoute
+  '/wishlist': typeof ShellWishlistRoute
+  '/': typeof ShellIndexRoute
+  '/comic/$id': typeof ShellComicIdRoute
+}
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/_shell': typeof ShellRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
+  '/_shell/favorites': typeof ShellFavoritesRoute
+  '/_shell/inventory': typeof ShellInventoryRoute
+  '/_shell/lists': typeof ShellListsRoute
+  '/_shell/new-arrivals': typeof ShellNewArrivalsRoute
+  '/_shell/profile': typeof ShellProfileRoute
+  '/_shell/reading-list': typeof ShellReadingListRoute
+  '/_shell/search': typeof ShellSearchRoute
+  '/_shell/settings': typeof ShellSettingsRoute
+  '/_shell/wishlist': typeof ShellWishlistRoute
+  '/_shell/': typeof ShellIndexRoute
+  '/_shell/comic/$id': typeof ShellComicIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: never
+  fullPaths:
+    | '/'
+    | '/forgot-password'
+    | '/login'
+    | '/signup'
+    | '/favorites'
+    | '/inventory'
+    | '/lists'
+    | '/new-arrivals'
+    | '/profile'
+    | '/reading-list'
+    | '/search'
+    | '/settings'
+    | '/wishlist'
+    | '/comic/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: never
-  id: '__root__'
+  to:
+    | '/forgot-password'
+    | '/login'
+    | '/signup'
+    | '/favorites'
+    | '/inventory'
+    | '/lists'
+    | '/new-arrivals'
+    | '/profile'
+    | '/reading-list'
+    | '/search'
+    | '/settings'
+    | '/wishlist'
+    | '/'
+    | '/comic/$id'
+  id:
+    | '__root__'
+    | '/_shell'
+    | '/forgot-password'
+    | '/login'
+    | '/signup'
+    | '/_shell/favorites'
+    | '/_shell/inventory'
+    | '/_shell/lists'
+    | '/_shell/new-arrivals'
+    | '/_shell/profile'
+    | '/_shell/reading-list'
+    | '/_shell/search'
+    | '/_shell/settings'
+    | '/_shell/wishlist'
+    | '/_shell/'
+    | '/_shell/comic/$id'
   fileRoutesById: FileRoutesById
 }
-export interface RootRouteChildren {}
-
-declare module '@tanstack/react-router' {
-  interface FileRoutesByPath {}
+export interface RootRouteChildren {
+  ShellRoute: typeof ShellRouteWithChildren
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
+  LoginRoute: typeof LoginRoute
+  SignupRoute: typeof SignupRoute
 }
 
-const rootRouteChildren: RootRouteChildren = {}
+declare module '@tanstack/react-router' {
+  interface FileRoutesByPath {
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_shell': {
+      id: '/_shell'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof ShellRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_shell/': {
+      id: '/_shell/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof ShellIndexRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/wishlist': {
+      id: '/_shell/wishlist'
+      path: '/wishlist'
+      fullPath: '/wishlist'
+      preLoaderRoute: typeof ShellWishlistRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/settings': {
+      id: '/_shell/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof ShellSettingsRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/search': {
+      id: '/_shell/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof ShellSearchRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/reading-list': {
+      id: '/_shell/reading-list'
+      path: '/reading-list'
+      fullPath: '/reading-list'
+      preLoaderRoute: typeof ShellReadingListRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/profile': {
+      id: '/_shell/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ShellProfileRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/new-arrivals': {
+      id: '/_shell/new-arrivals'
+      path: '/new-arrivals'
+      fullPath: '/new-arrivals'
+      preLoaderRoute: typeof ShellNewArrivalsRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/lists': {
+      id: '/_shell/lists'
+      path: '/lists'
+      fullPath: '/lists'
+      preLoaderRoute: typeof ShellListsRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/inventory': {
+      id: '/_shell/inventory'
+      path: '/inventory'
+      fullPath: '/inventory'
+      preLoaderRoute: typeof ShellInventoryRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/favorites': {
+      id: '/_shell/favorites'
+      path: '/favorites'
+      fullPath: '/favorites'
+      preLoaderRoute: typeof ShellFavoritesRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/comic/$id': {
+      id: '/_shell/comic/$id'
+      path: '/comic/$id'
+      fullPath: '/comic/$id'
+      preLoaderRoute: typeof ShellComicIdRouteImport
+      parentRoute: typeof ShellRoute
+    }
+  }
+}
+
+interface ShellRouteChildren {
+  ShellFavoritesRoute: typeof ShellFavoritesRoute
+  ShellInventoryRoute: typeof ShellInventoryRoute
+  ShellListsRoute: typeof ShellListsRoute
+  ShellNewArrivalsRoute: typeof ShellNewArrivalsRoute
+  ShellProfileRoute: typeof ShellProfileRoute
+  ShellReadingListRoute: typeof ShellReadingListRoute
+  ShellSearchRoute: typeof ShellSearchRoute
+  ShellSettingsRoute: typeof ShellSettingsRoute
+  ShellWishlistRoute: typeof ShellWishlistRoute
+  ShellIndexRoute: typeof ShellIndexRoute
+  ShellComicIdRoute: typeof ShellComicIdRoute
+}
+
+const ShellRouteChildren: ShellRouteChildren = {
+  ShellFavoritesRoute: ShellFavoritesRoute,
+  ShellInventoryRoute: ShellInventoryRoute,
+  ShellListsRoute: ShellListsRoute,
+  ShellNewArrivalsRoute: ShellNewArrivalsRoute,
+  ShellProfileRoute: ShellProfileRoute,
+  ShellReadingListRoute: ShellReadingListRoute,
+  ShellSearchRoute: ShellSearchRoute,
+  ShellSettingsRoute: ShellSettingsRoute,
+  ShellWishlistRoute: ShellWishlistRoute,
+  ShellIndexRoute: ShellIndexRoute,
+  ShellComicIdRoute: ShellComicIdRoute,
+}
+
+const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
+
+const rootRouteChildren: RootRouteChildren = {
+  ShellRoute: ShellRouteWithChildren,
+  ForgotPasswordRoute: ForgotPasswordRoute,
+  LoginRoute: LoginRoute,
+  SignupRoute: SignupRoute,
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()

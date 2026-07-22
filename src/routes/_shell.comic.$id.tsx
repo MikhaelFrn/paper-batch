@@ -108,9 +108,9 @@ function ComicDetail() {
           <div className="space-y-4 rounded-xl border border-border/60 bg-card/60 p-5">
             <h2 className="font-display text-lg tracking-wide">Story</h2>
             <Separator />
-            <Field label="Characters" value={<div className="flex flex-wrap gap-1.5">{comic.characters.map((c) => <span key={c} className="rounded-md border border-border bg-muted/40 px-2 py-0.5 text-xs">{c}</span>)}</div>} />
-            <Field label="Teams" value={comic.teams.length ? <div className="flex flex-wrap gap-1.5">{comic.teams.map((t) => <span key={t} className="rounded-md border border-border bg-muted/40 px-2 py-0.5 text-xs">{t}</span>)}</div> : "—"} />
-            <Field label="Story arcs" value={<div className="flex flex-wrap gap-1.5">{comic.storyArcs.map((s) => <span key={s} className="rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-xs text-accent">{s}</span>)}</div>} />
+            <Field label="Characters" value={<div className="flex flex-wrap gap-1.5">{comic.characters.map((c: string) => <span key={c} className="rounded-md border border-border bg-muted/40 px-2 py-0.5 text-xs">{c}</span>)}</div>} />
+            <Field label="Teams" value={comic.teams.length ? <div className="flex flex-wrap gap-1.5">{comic.teams.map((t: string) => <span key={t} className="rounded-md border border-border bg-muted/40 px-2 py-0.5 text-xs">{t}</span>)}</div> : "—"} />
+            <Field label="Story arcs" value={<div className="flex flex-wrap gap-1.5">{comic.storyArcs.map((s: string) => <span key={s} className="rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-xs text-accent">{s}</span>)}</div>} />
           </div>
         </section>
 
