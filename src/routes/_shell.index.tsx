@@ -88,7 +88,7 @@ function Dashboard() {
           <div className="min-w-0">
             <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80">Welcome back, Peter</div>
             <h1 className="font-display mt-1 text-3xl tracking-wide text-white sm:text-5xl">
-              {stats.owned} issues in your longbox.
+              {ownedCount} issues in your longbox.
             </h1>
             <p className="mt-2 max-w-lg text-sm text-white/85">
               Pick up where you left off — you've got {readingProgress.length} comics mid-read and {arrivals.length} new arrivals waiting.
