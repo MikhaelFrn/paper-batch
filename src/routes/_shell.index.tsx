@@ -103,10 +103,10 @@ function Dashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard icon={Library} label="Owned" value={stats.owned} tone="bg-primary/15 text-primary" />
-        <StatCard icon={BookOpen} label="Read" value={stats.read} tone="bg-accent/15 text-accent" />
-        <StatCard icon={Bookmark} label="Wishlist" value={stats.wishlist} tone="bg-gold/15 text-gold" />
-        <StatCard icon={Heart} label="Favorites" value={stats.favorites} tone="bg-emerald-500/15 text-emerald-400" />
+        <StatCard icon={Library} label="Owned" value={ownedCount} tone="bg-primary/15 text-primary" />
+        <StatCard icon={BookOpen} label="Read" value={readCount} tone="bg-accent/15 text-accent" />
+        <StatCard icon={Bookmark} label="Wishlist" value={wishCount} tone="bg-gold/15 text-gold" />
+        <StatCard icon={Heart} label="Favorites" value={favCount} tone="bg-emerald-500/15 text-emerald-400" />
       </div>
 
       {/* Continue reading */}
