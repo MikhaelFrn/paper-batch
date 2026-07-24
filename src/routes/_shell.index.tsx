@@ -7,15 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import {
-  comics,
-  favoriteArtists,
-  favoritePublishers,
-  favoriteSeries,
-  favoriteWriters,
-  readingProgress,
-  stats,
-  getComic,
-} from "@/lib/mock-data";
+  useComics,
+  useCollectionStats,
+  useCreatorSummary,
+  useNewArrivals,
+  useReadingProgress,
+  useRecentlyAdded,
+  useWishlist,
+} from "@/hooks/queries";
+import { favoritePublishers, favoriteSeries } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/_shell/")({
   head: () => ({
