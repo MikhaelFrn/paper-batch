@@ -167,7 +167,7 @@ function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              {wishlist.map((c) => (
+              {wishlistPreview.map((c) => (
                 <ComicCard key={c.id} comic={c} compact />
               ))}
             </div>
