@@ -3,8 +3,7 @@ import { useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { ComicCard, PublisherBadge } from "@/components/comic-card";
 import { Button } from "@/components/ui/button";
-import { comicsService } from "@/services/comics";
-import { useNewArrivals } from "@/hooks/queries";
+import { comics, publishers } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/_shell/new-arrivals")({
   head: () => ({
@@ -20,8 +19,9 @@ export const Route = createFileRoute("/_shell/new-arrivals")({
 
 function NewArrivals() {
   const [pub, setPub] = useState<string | null>(null);
-  const publishers = comicsService.publishers();
-  const { data: weekly = [] } = useNewArrivals(pub);
+  const weekly = [...comics]
+    .sort((a, b) => +new Date(b.releaseDate) - +new Date(a.releaseDate))
+    .filter((c) => (pub ? c.publisher === pub : true));
 
   return (
     <div>

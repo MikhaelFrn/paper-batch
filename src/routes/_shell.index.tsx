@@ -7,15 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import {
-  useComics,
-  useCollectionStats,
-  useCreatorSummary,
-  useNewArrivals,
-  useReadingProgress,
-  useRecentlyAdded,
-  useWishlist,
-} from "@/hooks/queries";
-import { favoritePublishers, favoriteSeries } from "@/lib/mock-data";
+  comics,
+  favoriteArtists,
+  favoritePublishers,
+  favoriteSeries,
+  favoriteWriters,
+  readingProgress,
+  stats,
+  getComic,
+} from "@/lib/mock-data";
 
 export const Route = createFileRoute("/_shell/")({
   head: () => ({
@@ -59,25 +59,11 @@ function SectionHeader({ title, to }: { title: string; to?: string }) {
 }
 
 function Dashboard() {
-  const { data: recent = [] } = useRecentlyAdded(6);
-  const { data: arrivalsAll = [] } = useNewArrivals(null);
-  const { data: wishlist = [] } = useWishlist();
-  const { data: readingProgress = [] } = useReadingProgress();
-  const { data: stats } = useCollectionStats();
-  const { data: allComics = [] } = useComics();
-  const { data: creators } = useCreatorSummary();
-
-  const arrivals = arrivalsAll
+  const recent = [...comics].sort((a, b) => +new Date(b.addedDate) - +new Date(a.addedDate)).slice(0, 6);
+  const arrivals = [...comics]
     .filter((c) => new Date(c.releaseDate) > new Date("2026-07-01"))
     .slice(0, 6);
-  const wishlistPreview = wishlist.slice(0, 4);
-  const getComic = (id: string) => allComics.find((c) => c.id === id);
-  const ownedCount = stats?.owned ?? 0;
-  const readCount = stats?.read ?? 0;
-  const wishCount = stats?.wishlist ?? 0;
-  const favCount = stats?.favorites ?? 0;
-  const favoriteWriters = creators?.favoriteWriters ?? [];
-  const favoriteArtists = creators?.favoriteArtists ?? [];
+  const wishlist = comics.filter((c) => c.wishlist).slice(0, 4);
 
   return (
     <div className="space-y-8">
@@ -88,7 +74,7 @@ function Dashboard() {
           <div className="min-w-0">
             <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80">Welcome back, Peter</div>
             <h1 className="font-display mt-1 text-3xl tracking-wide text-white sm:text-5xl">
-              {ownedCount} issues in your longbox.
+              {stats.owned} issues in your longbox.
             </h1>
             <p className="mt-2 max-w-lg text-sm text-white/85">
               Pick up where you left off — you've got {readingProgress.length} comics mid-read and {arrivals.length} new arrivals waiting.
@@ -103,10 +89,10 @@ function Dashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard icon={Library} label="Owned" value={ownedCount} tone="bg-primary/15 text-primary" />
-        <StatCard icon={BookOpen} label="Read" value={readCount} tone="bg-accent/15 text-accent" />
-        <StatCard icon={Bookmark} label="Wishlist" value={wishCount} tone="bg-gold/15 text-gold" />
-        <StatCard icon={Heart} label="Favorites" value={favCount} tone="bg-emerald-500/15 text-emerald-400" />
+        <StatCard icon={Library} label="Owned" value={stats.owned} tone="bg-primary/15 text-primary" />
+        <StatCard icon={BookOpen} label="Read" value={stats.read} tone="bg-accent/15 text-accent" />
+        <StatCard icon={Bookmark} label="Wishlist" value={stats.wishlist} tone="bg-gold/15 text-gold" />
+        <StatCard icon={Heart} label="Favorites" value={stats.favorites} tone="bg-emerald-500/15 text-emerald-400" />
       </div>
 
       {/* Continue reading */}
@@ -167,7 +153,7 @@ function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              {wishlistPreview.map((c) => (
+              {wishlist.map((c) => (
                 <ComicCard key={c.id} comic={c} compact />
               ))}
             </div>
