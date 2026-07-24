@@ -59,11 +59,25 @@ function SectionHeader({ title, to }: { title: string; to?: string }) {
 }
 
 function Dashboard() {
-  const recent = [...comics].sort((a, b) => +new Date(b.addedDate) - +new Date(a.addedDate)).slice(0, 6);
-  const arrivals = [...comics]
+  const { data: recent = [] } = useRecentlyAdded(6);
+  const { data: arrivalsAll = [] } = useNewArrivals(null);
+  const { data: wishlist = [] } = useWishlist();
+  const { data: readingProgress = [] } = useReadingProgress();
+  const { data: stats } = useCollectionStats();
+  const { data: allComics = [] } = useComics();
+  const { data: creators } = useCreatorSummary();
+
+  const arrivals = arrivalsAll
     .filter((c) => new Date(c.releaseDate) > new Date("2026-07-01"))
     .slice(0, 6);
-  const wishlist = comics.filter((c) => c.wishlist).slice(0, 4);
+  const wishlistPreview = wishlist.slice(0, 4);
+  const getComic = (id: string) => allComics.find((c) => c.id === id);
+  const ownedCount = stats?.owned ?? 0;
+  const readCount = stats?.read ?? 0;
+  const wishCount = stats?.wishlist ?? 0;
+  const favCount = stats?.favorites ?? 0;
+  const favoriteWriters = creators?.favoriteWriters ?? [];
+  const favoriteArtists = creators?.favoriteArtists ?? [];
 
   return (
     <div className="space-y-8">
