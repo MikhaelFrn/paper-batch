@@ -1,6 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
-
-export const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
-);
+// Re-export the typed Supabase client from the canonical integration path.
+// Kept for backwards-compat with existing imports; new code should import
+// from "@/integrations/supabase/client".
+export { supabase } from "@/integrations/supabase/client";
+export type { Database } from "@/integrations/supabase/database.types";
