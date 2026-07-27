@@ -3,7 +3,7 @@ import { Bookmark, Share2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { ComicCard } from "@/components/comic-card";
 import { Button } from "@/components/ui/button";
-import { useWishlist } from "@/hooks/queries";
+import { comics } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/_shell/wishlist")({
   head: () => ({
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/_shell/wishlist")({
 });
 
 function Wishlist() {
-  const { data: list = [] } = useWishlist();
+  const list = comics.filter((c) => c.wishlist);
   return (
     <div>
       <PageHeader

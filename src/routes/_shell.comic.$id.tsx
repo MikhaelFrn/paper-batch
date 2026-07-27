@@ -5,12 +5,11 @@ import { ComicCover } from "@/components/comic-cover";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { comicsService } from "@/services/comics";
-import { useComic, useComics, useRelatedComics } from "@/hooks/queries";
+import { getComic, relatedComics, comics } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/_shell/comic/$id")({
-  loader: async ({ params }) => {
-    const comic = await comicsService.getById(params.id);
+  loader: ({ params }) => {
+    const comic = getComic(params.id);
     if (!comic) throw notFound();
     return { comic };
   },
@@ -34,12 +33,6 @@ export const Route = createFileRoute("/_shell/comic/$id")({
       <Link to="/inventory" className="mt-4 inline-block text-primary">Back to inventory</Link>
     </div>
   ),
-  errorComponent: ({ error }) => (
-    <div className="py-20 text-center">
-      <div className="font-display text-4xl">Something went wrong</div>
-      <p className="mt-2 text-muted-foreground">{error.message}</p>
-    </div>
-  ),
 });
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -52,11 +45,9 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 function ComicDetail() {
-  const { comic: initial } = Route.useLoaderData();
-  const { data: comic = initial } = useComic(initial.id);
-  const { data: related = [] } = useRelatedComics(initial.id);
-  const { data: allComics = [] } = useComics();
-  const recommended = allComics.filter((c) => c.id !== comic.id && c.favorite).slice(0, 6);
+  const { comic } = Route.useLoaderData();
+  const related = relatedComics(comic);
+  const recommended = comics.filter((c) => c.id !== comic.id && c.favorite).slice(0, 6);
 
   return (
     <div className="-mx-4 sm:-mx-6 lg:-mx-8">

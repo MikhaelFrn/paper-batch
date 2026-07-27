@@ -1,55 +1,57 @@
-import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
+import type { Session, User } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
+import { ServiceError } from "@/lib/types";
 
-export interface AuthUser {
-  id: string;
-  email: string | null;
+export interface SignInParams { email: string; password: string }
+export interface SignUpParams {
+  email: string;
+  password: string;
+  displayName?: string;
 }
 
-export const authService = {
-  async getSession() {
-    if (!isSupabaseConfigured) return null;
-    const { data } = await supabase.auth.getSession();
-    return data.session;
-  },
+function raise(message: string, cause: unknown): never {
+  throw new ServiceError(message, { cause });
+}
 
-  async getUser(): Promise<AuthUser | null> {
-    if (!isSupabaseConfigured) {
-      return { id: "demo-user", email: "peter@dailybugle.com" };
-    }
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) return null;
-    return { id: data.user.id, email: data.user.email ?? null };
-  },
+export async function signInWithPassword(
+  params: SignInParams,
+): Promise<{ user: User; session: Session }> {
+  const { data, error } = await supabase.auth.signInWithPassword(params);
+  if (error || !data.session || !data.user) raise("Sign in failed", error);
+  return { user: data.user!, session: data.session! };
+}
 
-  async signIn(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    return data;
-  },
+export async function signUpWithPassword(
+  params: SignUpParams,
+): Promise<{ user: User | null; session: Session | null }> {
+  const { data, error } = await supabase.auth.signUp({
+    email: params.email,
+    password: params.password,
+    options: params.displayName
+      ? { data: { display_name: params.displayName } }
+      : undefined,
+  });
+  if (error) raise("Sign up failed", error);
+  return { user: data.user, session: data.session };
+}
 
-  async signUp(email: string, password: string) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: window.location.origin },
-    });
-    if (error) throw error;
-    return data;
-  },
+export async function signOut(): Promise<void> {
+  const { error } = await supabase.auth.signOut();
+  if (error) raise("Sign out failed", error);
+}
 
-  async signOut() {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-  },
+export async function requestPasswordReset(email: string): Promise<void> {
+  const { error } = await supabase.auth.resetPasswordForEmail(email);
+  if (error) raise("Password reset failed", error);
+}
 
-  async resetPassword(email: string) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    if (error) throw error;
-  },
+export async function getCurrentUser(): Promise<User | null> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) return null;
+  return data.user ?? null;
+}
 
-  onAuthStateChange(callback: (event: string) => void) {
-    return supabase.auth.onAuthStateChange((event) => callback(event));
-  },
-};
+export async function getCurrentSession(): Promise<Session | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session ?? null;
+}

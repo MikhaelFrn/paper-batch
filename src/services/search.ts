@@ -1,54 +1,94 @@
-import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
-import { comics as mockComics, series as mockSeries } from "@/lib/mock-data";
-import type { Comic } from "./types";
+import { supabase } from "@/integrations/supabase/client";
+import type {
+  Creator,
+  IssueWithRelations,
+  Publisher,
+  RunWithRelations,
+  SearchResults,
+  SeriesWithPublisher,
+  Volume,
+} from "@/lib/types";
+import { unwrap } from "./_utils";
 
-export interface SearchResults {
-  comics: Comic[];
-  series: string[];
-  writers: string[];
-  artists: string[];
-  characters: string[];
+const ISSUE_WITH_RELATIONS =
+  "*, volume:volumes(*, series:series(*, publisher:publishers(*))), issue_creators(role, creator:creators(*))" as const;
+const RUN_WITH_RELATIONS =
+  "*, series:series(*, publisher:publishers(*)), run_creators(role, creator:creators(*))" as const;
+const SERIES_WITH_PUBLISHER = "*, publisher:publishers(*)" as const;
+
+function esc(q: string): string {
+  // Escape PostgREST `or` filter special chars in ilike patterns.
+  return q.replace(/[,()]/g, " ").trim();
 }
 
-export const searchService = {
-  async query(q: string): Promise<SearchResults> {
-    const s = q.trim().toLowerCase();
-    if (!s) return { comics: [], series: [], writers: [], artists: [], characters: [] };
+export interface SearchOptions {
+  /** Max rows per entity group. Defaults to 20. */
+  limit?: number;
+}
 
-    if (!isSupabaseConfigured) {
-      const cs = mockComics.filter(
-        (c) =>
-          c.title.toLowerCase().includes(s) ||
-          c.series.toLowerCase().includes(s) ||
-          c.writers.some((w) => w.toLowerCase().includes(s)) ||
-          c.artists.some((a) => a.toLowerCase().includes(s)) ||
-          c.characters.some((ch) => ch.toLowerCase().includes(s)),
-      );
-      return {
-        comics: cs,
-        series: mockSeries.filter((x) => x.toLowerCase().includes(s)),
-        writers: [...new Set(mockComics.flatMap((c) => c.writers))].filter((x) =>
-          x.toLowerCase().includes(s),
-        ),
-        artists: [...new Set(mockComics.flatMap((c) => c.artists))].filter((x) =>
-          x.toLowerCase().includes(s),
-        ),
-        characters: [...new Set(mockComics.flatMap((c) => c.characters))].filter((x) =>
-          x.toLowerCase().includes(s),
-        ),
-      };
-    }
-    const { data } = await supabase
-      .from("comics")
+/**
+ * Server-side global search across issues, runs, volumes, series, creators,
+ * and publishers. Returns results grouped by entity type.
+ */
+export async function searchAll(
+  query: string,
+  options: SearchOptions = {},
+): Promise<SearchResults> {
+  const q = esc(query);
+  const limit = options.limit ?? 20;
+  const empty: SearchResults = {
+    issues: [],
+    series: [],
+    runs: [],
+    volumes: [],
+    creators: [],
+    publishers: [],
+  };
+  if (!q) return empty;
+
+  const like = `%${q}%`;
+
+  const [
+    issuesRes,
+    seriesRes,
+    runsRes,
+    volumesRes,
+    creatorsRes,
+    publishersRes,
+  ] = await Promise.all([
+    supabase
+      .from("issues")
+      .select(ISSUE_WITH_RELATIONS)
+      .or(`title.ilike.${like},issue_number.ilike.${like}`)
+      .limit(limit),
+    supabase
+      .from("series")
+      .select(SERIES_WITH_PUBLISHER)
+      .ilike("name", like)
+      .limit(limit),
+    supabase
+      .from("runs")
+      .select(RUN_WITH_RELATIONS)
+      .ilike("name", like)
+      .limit(limit),
+    supabase.from("volumes").select("*").ilike("name", like).limit(limit),
+    supabase
+      .from("creators")
       .select("*")
-      .ilike("title", `%${s}%`)
-      .limit(50);
-    return {
-      comics: (data as Comic[] | null) ?? [],
-      series: [],
-      writers: [],
-      artists: [],
-      characters: [],
-    };
-  },
-};
+      .or(`first_name.ilike.${like},last_name.ilike.${like}`)
+      .limit(limit),
+    supabase.from("publishers").select("*").ilike("name", like).limit(limit),
+  ]);
+
+  return {
+    issues: unwrap(issuesRes, "Failed to search issues") as IssueWithRelations[],
+    series: unwrap(seriesRes, "Failed to search series") as SeriesWithPublisher[],
+    runs: unwrap(runsRes, "Failed to search runs") as RunWithRelations[],
+    volumes: unwrap(volumesRes, "Failed to search volumes") as Volume[],
+    creators: unwrap(creatorsRes, "Failed to search creators") as Creator[],
+    publishers: unwrap(
+      publishersRes,
+      "Failed to search publishers",
+    ) as Publisher[],
+  };
+}
