@@ -12,11 +12,20 @@ import type {
   ListType,
   ListVisibility,
   ListMemberRole,
+  RunType,
+  RunStatus,
+  RelationshipType,
 } from "@/integrations/supabase/database.types";
 
 export type { Database, Tables, TablesInsert, TablesUpdate };
-export type { ListType, ListVisibility, ListMemberRole };
-
+export type {
+  ListType,
+  ListVisibility,
+  ListMemberRole,
+  RunType,
+  RunStatus,
+  RelationshipType,
+};
 // ---------- Row aliases ----------
 export type Publisher = Tables<"publishers">;
 export type Series = Tables<"series">;
@@ -26,7 +35,8 @@ export type Issue = Tables<"issues">;
 export type Creator = Tables<"creators">;
 export type IssueCreator = Tables<"issue_creators">;
 export type RunCreator = Tables<"run_creators">;
-export type RunVolume = Tables<"run_volumes">;
+export type RunItem = Tables<"run_items">;
+export type RunRelationship = Tables<"run_relationships">;
 export type UserComic = Tables<"user_comics">;
 export type FavoriteSeries = Tables<"favorite_series">;
 export type FavoriteCreator = Tables<"favorite_creators">;
@@ -45,6 +55,10 @@ export type UserComicUpdate = TablesUpdate<"user_comics">;
 export type ListInsert = TablesInsert<"lists">;
 export type ListUpdate = TablesUpdate<"lists">;
 export type ListItemInsert = TablesInsert<"list_items">;
+export type RunItemInsert = TablesInsert<"run_items">;
+export type RunItemUpdate = TablesUpdate<"run_items">;
+export type RunRelationshipInsert = TablesInsert<"run_relationships">;
+export type RunRelationshipUpdate = TablesUpdate<"run_relationships">;
 
 // ---------- Derived view models (computed, not a single row) ----------
 
@@ -60,6 +74,11 @@ export interface IssueWithRelations extends Issue {
   >;
 }
 
+export interface RunItemWithRelations extends RunItem {
+  issue: IssueWithRelations | null;
+  volume: Volume | null;
+}
+
 /** An issue in the current user's collection (join of user_comics + issue). */
 export interface UserCollectionEntry extends UserComic {
   issue: IssueWithRelations | null;
@@ -72,8 +91,30 @@ export interface SeriesWithPublisher extends Series {
 
 /** Run enriched with series + publisher + creators, for detail surfaces. */
 export interface RunWithRelations extends Run {
-  series: SeriesWithPublisher | null;
-  run_creators: Array<Pick<RunCreator, "role"> & { creator: Creator | null }>;
+  run_items: RunItemWithRelations[];
+  run_creators: Array<
+    Pick<RunCreator, "role"> & {
+      creator: Creator | null;
+    }
+  >;
+  outgoing_relationships: Array<
+    RunRelationship & {
+      target_run: Run | null;
+    }
+  >;
+  incoming_relationships: Array<
+    RunRelationship & {
+      source_run: Run | null;
+    }
+  >;
+}
+
+export interface RunTimelineEntry {
+  position: number;
+
+  issue?: IssueWithRelations | null;
+
+  volume?: Volume | null;
 }
 
 /** List with nested items (each item joined with its issue). */

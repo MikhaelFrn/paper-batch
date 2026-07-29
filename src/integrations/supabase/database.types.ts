@@ -14,6 +14,24 @@ export type ListType = "custom" | "reading" | "wishlist" | "favorites";
 export type ListVisibility = "private" | "public" | "unlisted";
 export type ListMemberRole = "owner" | "editor" | "viewer";
 
+export type RunType =
+  | "creative_run"
+  | "event"
+  | "reading_order";
+
+export type RunStatus =
+  | "draft"
+  | "verified";
+
+export type RelationshipType =
+  | "required_before"
+  | "recommended_before"
+  | "tie_in"
+  | "concurrent"
+  | "inspired_by"
+  | "continuation"
+  | "alternate_take";
+
 export interface Database {
   public: {
     Tables: {
@@ -81,30 +99,31 @@ export interface Database {
       runs: {
         Row: {
           id: string;
-          series_id: string;
-          name: string | null;
+          name: string;
           start_year: number | null;
           end_year: number | null;
           created_at: string | null;
+          type: RunType | null;
+          status: RunStatus;
+          verified_at: string | null;
+          description: string | null;
+          confidence: number | null;
         };
         Insert: {
           id?: string;
-          series_id: string;
-          name?: string | null;
+          name: string;
           start_year?: number | null;
           end_year?: number | null;
           created_at?: string | null;
+          type?: RunType;
+          status?: RunStatus;
+          verified_at?: string | null;
+          description?: string | null;
+          confidence?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["runs"]["Insert"]>;
-        Relationships: [
-          {
-            foreignKeyName: "runs_series_id_fkey";
-            columns: ["series_id"];
-            referencedRelation: "series";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
+        Relationships: [];
+  };
       volumes: {
         Row: {
           id: string;
@@ -253,10 +272,22 @@ export interface Database {
           },
         ];
       };
-      run_volumes: {
-        Row: { run_id: string; volume_id: string };
-        Insert: { run_id: string; volume_id: string };
-        Update: Partial<Database["public"]["Tables"]["run_volumes"]["Insert"]>;
+      run_items: {
+        Row: {
+          id: string;
+          run_id: string;
+          issue_id: string | null;
+          volume_id: string | null;
+          position: number;
+        };
+        Insert: {
+          id?: string;
+          run_id: string;
+          issue_id?: string | null;
+          volume_id?: string | null;
+          position: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["run_items"]["Insert"]>;
         Relationships: [
           {
             foreignKeyName: "run_volumes_run_id_fkey";
@@ -270,6 +301,45 @@ export interface Database {
             referencedRelation: "volumes";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "run_items_issue_id_fkey";
+            columns: ["issue_id"];
+            referencedRelation: "issues";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      run_relationships: {
+        Row: {
+          id: string;
+          source_run_id: string;
+          target_run_id: string;
+          relationship: RelationshipType;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          source_run_id: string;
+          target_run_id: string;
+          relationship: RelationshipType;
+          created_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["run_relationships"]["Insert"]
+        >;
+        Relationships: [
+          {
+            foreignKeyName: "fk_source_run";
+            columns: ["source_run_id"];
+            referencedRelation: "runs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "fk_target_run";
+            columns: ["target_run_id"];
+            referencedRelation: "runs";
+            referencedColumns: ["id"];
+          }
         ];
       };
       user_comics: {
@@ -473,6 +543,9 @@ export interface Database {
       list_type: ListType;
       list_visibility: ListVisibility;
       list_member_role: ListMemberRole;
+      run_type: RunType;
+      run_status: RunStatus;  
+      relationship_type: RelationshipType;
     };
     CompositeTypes: Record<string, never>;
   };
