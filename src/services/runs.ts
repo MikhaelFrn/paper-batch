@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Run, RunWithRelations } from "@/lib/types";
-import { unwrap, unwrapMaybe } from "./_utils";
+import { unwrapMaybe } from "./_utils";
 
 const RUN_WITH_RELATIONS =
   "*, series:series(*, publisher:publishers(*)), run_creators(role, creator:creators(*))" as const;
