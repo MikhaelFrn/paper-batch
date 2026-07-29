@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Search as SearchIcon } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
 import { ComicCard, PublisherBadge } from "@/components/comic-card";
 import { Card, CardContent } from "@/components/ui/card";
-import { comics } from "@/lib/mock-data";
+import { useSearch } from "@/hooks/useSearch";
+import { issueToComic } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/_shell/search")({
   head: () => ({
@@ -20,25 +21,11 @@ export const Route = createFileRoute("/_shell/search")({
 });
 
 function SearchPage() {
-  const [q, setQ] = useState("bat");
+  const [q, setQ] = useState("");
+  const search = useSearch(q, { limit: 20 });
+  const data = search.data;
 
-  const results = useMemo(() => {
-    const s = q.toLowerCase().trim();
-    if (!s) return { comics: [], series: [], writers: [], artists: [], publishers: [], characters: [], teams: [] };
-    const cs = comics.filter((c) => c.title.toLowerCase().includes(s) || c.series.toLowerCase().includes(s));
-    const uniq = <T,>(a: T[]) => Array.from(new Set(a));
-    return {
-      comics: cs,
-      series: uniq(comics.filter((c) => c.series.toLowerCase().includes(s)).map((c) => c.series)),
-      writers: uniq(comics.flatMap((c) => c.writers).filter((w) => w.toLowerCase().includes(s))),
-      artists: uniq(comics.flatMap((c) => c.artists).filter((a) => a.toLowerCase().includes(s))),
-      publishers: uniq(comics.map((c) => c.publisher).filter((p) => p.toLowerCase().includes(s))),
-      characters: uniq(comics.flatMap((c) => c.characters).filter((c) => c.toLowerCase().includes(s))),
-      teams: uniq(comics.flatMap((c) => c.teams).filter((t) => t.toLowerCase().includes(s))),
-    };
-  }, [q]);
-
-  const Group = ({ title, children, count }: any) =>
+  const Group = ({ title, children, count }: { title: string; children: React.ReactNode; count: number }) =>
     count === 0 ? null : (
       <section className="mb-8">
         <h2 className="font-display mb-3 text-lg tracking-wide">{title} <span className="text-xs text-muted-foreground">· {count}</span></h2>
@@ -56,30 +43,29 @@ function SearchPage() {
 
       {q.trim() === "" ? (
         <p className="text-sm text-muted-foreground">Start typing to search across the entire database.</p>
-      ) : (
+      ) : search.isLoading ? (
+        <p className="text-sm text-muted-foreground">Searching…</p>
+      ) : !data ? null : (
         <>
-          <Group title="Comics" count={results.comics.length}>
+          <Group title="Comics" count={data.issues.length}>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
-              {results.comics.map((c) => <ComicCard key={c.id} comic={c} />)}
+              {data.issues.map((i) => <ComicCard key={i.id} comic={issueToComic(i)} />)}
             </div>
           </Group>
-          <Group title="Series" count={results.series.length}>
-            <div className="flex flex-wrap gap-2">{results.series.map((s) => <Card key={s} className="border-border/60"><CardContent className="p-3 text-sm">{s}</CardContent></Card>)}</div>
+          <Group title="Series" count={data.series.length}>
+            <div className="flex flex-wrap gap-2">{data.series.map((s) => <Card key={s.id} className="border-border/60"><CardContent className="p-3 text-sm">{s.name}</CardContent></Card>)}</div>
           </Group>
-          <Group title="Writers" count={results.writers.length}>
-            <div className="flex flex-wrap gap-2">{results.writers.map((s) => <span key={s} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm">{s}</span>)}</div>
+          <Group title="Runs" count={data.runs.length}>
+            <div className="flex flex-wrap gap-2">{data.runs.map((r) => <span key={r.id} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm">{r.name}</span>)}</div>
           </Group>
-          <Group title="Artists" count={results.artists.length}>
-            <div className="flex flex-wrap gap-2">{results.artists.map((s) => <span key={s} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm">{s}</span>)}</div>
+          <Group title="Volumes" count={data.volumes.length}>
+            <div className="flex flex-wrap gap-2">{data.volumes.map((v) => <span key={v.id} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm">{v.name}</span>)}</div>
           </Group>
-          <Group title="Publishers" count={results.publishers.length}>
-            <div className="flex flex-wrap gap-2">{results.publishers.map((p: any) => <PublisherBadge key={p} publisher={p} />)}</div>
+          <Group title="Creators" count={data.creators.length}>
+            <div className="flex flex-wrap gap-2">{data.creators.map((c) => <span key={c.id} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm">{[c.first_name, c.last_name].filter(Boolean).join(" ")}</span>)}</div>
           </Group>
-          <Group title="Characters" count={results.characters.length}>
-            <div className="flex flex-wrap gap-2">{results.characters.map((s) => <span key={s} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm">{s}</span>)}</div>
-          </Group>
-          <Group title="Teams" count={results.teams.length}>
-            <div className="flex flex-wrap gap-2">{results.teams.map((s) => <span key={s} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm">{s}</span>)}</div>
+          <Group title="Publishers" count={data.publishers.length}>
+            <div className="flex flex-wrap gap-2">{data.publishers.map((p) => <PublisherBadge key={p.id} publisher={p.name} />)}</div>
           </Group>
         </>
       )}

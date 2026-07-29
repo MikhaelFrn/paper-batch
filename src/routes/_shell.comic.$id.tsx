@@ -1,38 +1,24 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Bookmark, BookOpen, Heart, Share2, Star } from "lucide-react";
 import { ComicCard, PublisherBadge, RatingStars } from "@/components/comic-card";
 import { ComicCover } from "@/components/comic-cover";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { getComic, relatedComics, comics } from "@/lib/mock-data";
+import { useIssue, useRecentIssues } from "@/hooks/useIssues";
+import { useMyUserComicByIssue } from "@/hooks/useUserComics";
+import { issueToComic } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/_shell/comic/$id")({
-  loader: ({ params }) => {
-    const comic = getComic(params.id);
-    if (!comic) throw notFound();
-    return { comic };
-  },
-  head: ({ loaderData }) => {
-    const c = loaderData?.comic;
-    const title = c ? `${c.series} #${c.issue} — ${c.title}` : "Comic";
-    return {
-      meta: [
-        { title: `${title} · Longbox` },
-        { name: "description", content: c?.synopsis?.slice(0, 155) ?? "Comic detail" },
-        { property: "og:title", content: title },
-        { property: "og:description", content: c?.synopsis?.slice(0, 155) ?? "" },
-      ],
-    };
-  },
+  head: () => ({
+    meta: [
+      { title: "Comic · Longbox" },
+      { name: "description", content: "Comic detail" },
+      { property: "og:title", content: "Comic — Longbox" },
+      { property: "og:description", content: "Full metadata and credits for this issue." },
+    ],
+  }),
   component: ComicDetail,
-  notFoundComponent: () => (
-    <div className="py-20 text-center">
-      <div className="font-display text-4xl">Not found</div>
-      <p className="mt-2 text-muted-foreground">That issue isn't in the database.</p>
-      <Link to="/inventory" className="mt-4 inline-block text-primary">Back to inventory</Link>
-    </div>
-  ),
 });
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -45,9 +31,38 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 function ComicDetail() {
-  const { comic } = Route.useLoaderData();
-  const related = relatedComics(comic);
-  const recommended = comics.filter((c) => c.id !== comic.id && c.favorite).slice(0, 6);
+  const { id } = Route.useParams();
+  const issueQ = useIssue(id);
+  const userComicQ = useMyUserComicByIssue(id);
+  const recent = useRecentIssues(24);
+
+  if (issueQ.isLoading) {
+    return <div className="py-20 text-center text-sm text-muted-foreground">Loading…</div>;
+  }
+  if (!issueQ.data) {
+    return (
+      <div className="py-20 text-center">
+        <div className="font-display text-4xl">Not found</div>
+        <p className="mt-2 text-muted-foreground">That issue isn't in the database.</p>
+        <Link to="/inventory" className="mt-4 inline-block text-primary">Back to inventory</Link>
+      </div>
+    );
+  }
+
+  const uc = userComicQ.data;
+  const comic = issueToComic(issueQ.data, {
+    owned: uc?.owned ?? false,
+    read: uc?.read ?? false,
+    rating: uc?.rating,
+  });
+  const related = (recent.data ?? [])
+    .filter((i) => i.id !== comic.id && i.volume?.series?.name === comic.series)
+    .slice(0, 6)
+    .map((i) => issueToComic(i));
+  const recommended = (recent.data ?? [])
+    .filter((i) => i.id !== comic.id)
+    .slice(0, 6)
+    .map((i) => issueToComic(i));
 
   return (
     <div className="-mx-4 sm:-mx-6 lg:-mx-8">
@@ -68,7 +83,7 @@ function ComicDetail() {
             <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-white/85">
               <span>By {comic.writers.join(", ")}</span>
               <span>·</span>
-              <span>Art {comic.artists.join(", ")}</span>
+              <span>Art {comic.artists.join(", ") || "—"}</span>
               <span>·</span>
               <span>{new Date(comic.releaseDate).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}</span>
               {comic.rating && <><span>·</span><RatingStars value={comic.rating} /></>}
@@ -101,16 +116,16 @@ function ComicDetail() {
               <Field label="Publisher" value={comic.publisher} />
               <Field label="Released" value={new Date(comic.releaseDate).toLocaleDateString()} />
               <Field label="Writer(s)" value={comic.writers.join(", ")} />
-              <Field label="Artist(s)" value={comic.artists.join(", ")} />
+              <Field label="Artist(s)" value={comic.artists.join(", ") || "—"} />
               <Field label="Cover" value={comic.coverArtist ?? "—"} />
             </div>
           </div>
           <div className="space-y-4 rounded-xl border border-border/60 bg-card/60 p-5">
             <h2 className="font-display text-lg tracking-wide">Story</h2>
             <Separator />
-            <Field label="Characters" value={<div className="flex flex-wrap gap-1.5">{comic.characters.map((c: string) => <span key={c} className="rounded-md border border-border bg-muted/40 px-2 py-0.5 text-xs">{c}</span>)}</div>} />
-            <Field label="Teams" value={comic.teams.length ? <div className="flex flex-wrap gap-1.5">{comic.teams.map((t: string) => <span key={t} className="rounded-md border border-border bg-muted/40 px-2 py-0.5 text-xs">{t}</span>)}</div> : "—"} />
-            <Field label="Story arcs" value={<div className="flex flex-wrap gap-1.5">{comic.storyArcs.map((s: string) => <span key={s} className="rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-xs text-accent">{s}</span>)}</div>} />
+            <Field label="Characters" value={comic.characters.length ? <div className="flex flex-wrap gap-1.5">{comic.characters.map((c) => <span key={c} className="rounded-md border border-border bg-muted/40 px-2 py-0.5 text-xs">{c}</span>)}</div> : "—"} />
+            <Field label="Teams" value={comic.teams.length ? <div className="flex flex-wrap gap-1.5">{comic.teams.map((t) => <span key={t} className="rounded-md border border-border bg-muted/40 px-2 py-0.5 text-xs">{t}</span>)}</div> : "—"} />
+            <Field label="Story arcs" value={comic.storyArcs.length ? <div className="flex flex-wrap gap-1.5">{comic.storyArcs.map((s) => <span key={s} className="rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-xs text-accent">{s}</span>)}</div> : "—"} />
           </div>
         </section>
 

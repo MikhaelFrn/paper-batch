@@ -15,8 +15,11 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { comics, publishers, series } from "@/lib/mock-data";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { useUserCollection } from "@/hooks/useUserComics";
+import { usePublishers } from "@/hooks/usePublishers";
+import { useSeriesList } from "@/hooks/useSeries";
+import { userComicToComic } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/_shell/inventory")({
   head: () => ({
@@ -32,15 +35,23 @@ export const Route = createFileRoute("/_shell/inventory")({
 
 type Sort = "recent" | "title" | "publisher" | "release" | "alpha";
 
-function Filters({ pubs, setPubs, seriesSel, setSeriesSel, readOnly, setReadOnly, ownedOnly, setOwnedOnly, wishlistOnly, setWishlistOnly }: any) {
+function Filters({ publisherNames, seriesNames, pubs, setPubs, seriesSel, setSeriesSel, readOnly, setReadOnly, ownedOnly, setOwnedOnly, wishlistOnly, setWishlistOnly }: {
+  publisherNames: string[];
+  seriesNames: string[];
+  pubs: string[]; setPubs: (v: string[]) => void;
+  seriesSel: string[]; setSeriesSel: (v: string[]) => void;
+  readOnly: boolean; setReadOnly: (v: boolean) => void;
+  ownedOnly: boolean; setOwnedOnly: (v: boolean) => void;
+  wishlistOnly: boolean; setWishlistOnly: (v: boolean) => void;
+}) {
   return (
     <div className="space-y-6 text-sm">
       <div>
         <Label className="text-xs uppercase tracking-widest text-muted-foreground">Publisher</Label>
         <div className="mt-2 space-y-2">
-          {publishers.map((p) => (
+          {publisherNames.map((p) => (
             <label key={p} className="flex items-center gap-2">
-              <Checkbox checked={pubs.includes(p)} onCheckedChange={(v) => setPubs(v ? [...pubs, p] : pubs.filter((x: string) => x !== p))} />
+              <Checkbox checked={pubs.includes(p)} onCheckedChange={(v) => setPubs(v ? [...pubs, p] : pubs.filter((x) => x !== p))} />
               <PublisherBadge publisher={p} />
             </label>
           ))}
@@ -49,9 +60,9 @@ function Filters({ pubs, setPubs, seriesSel, setSeriesSel, readOnly, setReadOnly
       <div>
         <Label className="text-xs uppercase tracking-widest text-muted-foreground">Series</Label>
         <div className="mt-2 max-h-40 space-y-1.5 overflow-auto pr-1">
-          {series.map((s) => (
+          {seriesNames.map((s) => (
             <label key={s} className="flex items-center gap-2">
-              <Checkbox checked={seriesSel.includes(s)} onCheckedChange={(v) => setSeriesSel(v ? [...seriesSel, s] : seriesSel.filter((x: string) => x !== s))} />
+              <Checkbox checked={seriesSel.includes(s)} onCheckedChange={(v) => setSeriesSel(v ? [...seriesSel, s] : seriesSel.filter((x) => x !== s))} />
               <span className="truncate">{s}</span>
             </label>
           ))}
@@ -79,8 +90,23 @@ function Inventory() {
   const [sort, setSort] = useState<Sort>("recent");
   const [view, setView] = useState<"grid" | "list">("grid");
 
+  const collection = useUserCollection();
+  const publishers = usePublishers();
+  const seriesList = useSeriesList();
+
+  const publisherNames = useMemo(() => (publishers.data ?? []).map((p) => p.name), [publishers.data]);
+  const seriesNames = useMemo(() => (seriesList.data ?? []).map((s) => s.name), [seriesList.data]);
+
+  const allComics = useMemo(
+    () =>
+      (collection.data ?? [])
+        .map((e) => userComicToComic(e))
+        .filter((c): c is NonNullable<typeof c> => !!c),
+    [collection.data],
+  );
+
   const filtered = useMemo(() => {
-    let list = comics.slice();
+    let list = allComics.slice();
     if (pubs.length) list = list.filter((c) => pubs.includes(c.publisher));
     if (seriesSel.length) list = list.filter((c) => seriesSel.includes(c.series));
     if (ownedOnly) list = list.filter((c) => c.owned);
@@ -112,16 +138,16 @@ function Inventory() {
         break;
     }
     return list;
-  }, [pubs, seriesSel, ownedOnly, readOnly, wishlistOnly, q, sort]);
+  }, [allComics, pubs, seriesSel, ownedOnly, readOnly, wishlistOnly, q, sort]);
 
-  const filterProps = { pubs, setPubs, seriesSel, setSeriesSel, readOnly, setReadOnly, ownedOnly, setOwnedOnly, wishlistOnly, setWishlistOnly };
+  const filterProps = { publisherNames, seriesNames, pubs, setPubs, seriesSel, setSeriesSel, readOnly, setReadOnly, ownedOnly, setOwnedOnly, wishlistOnly, setWishlistOnly };
 
   return (
     <div>
       <PageHeader
         eyebrow="Your Longbox"
         title="Inventory"
-        description={`${filtered.length} of ${comics.length} issues`}
+        description={`${filtered.length} of ${allComics.length} issues`}
         actions={
           <>
             <Sheet>
@@ -162,7 +188,9 @@ function Inventory() {
         <div>
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Quick filter within your collection…" className="mb-4 max-w-md" />
 
-          {view === "grid" ? (
+          {collection.isLoading ? (
+            <div className="py-10 text-sm text-muted-foreground">Loading your collection…</div>
+          ) : view === "grid" ? (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
               {filtered.map((c) => <ComicCard key={c.id} comic={c} />)}
             </div>

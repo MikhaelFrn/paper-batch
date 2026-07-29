@@ -6,16 +6,16 @@ import { ComicCover } from "@/components/comic-cover";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
+import { useUserCollection } from "@/hooks/useUserComics";
+import { useRecentIssues } from "@/hooks/useIssues";
 import {
-  comics,
-  favoriteArtists,
-  favoritePublishers,
-  favoriteSeries,
-  favoriteWriters,
-  readingProgress,
-  stats,
-  getComic,
-} from "@/lib/mock-data";
+  useFavoriteSeries,
+  useFavoritePublishers,
+  useFavoriteCreators,
+} from "@/hooks/useFavorites";
+import { useMyLists, useList } from "@/hooks/useLists";
+import { useMyProfile } from "@/hooks/useProfiles";
+import { issueToComic, userComicToComic } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/_shell/")({
   head: () => ({
@@ -59,11 +59,39 @@ function SectionHeader({ title, to }: { title: string; to?: string }) {
 }
 
 function Dashboard() {
-  const recent = [...comics].sort((a, b) => +new Date(b.addedDate) - +new Date(a.addedDate)).slice(0, 6);
-  const arrivals = [...comics]
-    .filter((c) => new Date(c.releaseDate) > new Date("2026-07-01"))
-    .slice(0, 6);
-  const wishlist = comics.filter((c) => c.wishlist).slice(0, 4);
+  const profile = useMyProfile();
+  const collection = useUserCollection();
+  const recentIssues = useRecentIssues(6);
+  const favSeries = useFavoriteSeries();
+  const favPublishers = useFavoritePublishers();
+  const favCreators = useFavoriteCreators();
+  const lists = useMyLists();
+  const wishlistList = lists.data?.find((l) => l.type === "wishlist");
+  const wishlistDetail = useList(wishlistList?.id);
+
+  const entries = collection.data ?? [];
+  const recent = entries
+    .slice(0, 6)
+    .map((e) => userComicToComic(e))
+    .filter((c): c is NonNullable<typeof c> => !!c);
+  const arrivals = (recentIssues.data ?? []).map((i) => issueToComic(i));
+  const wishlistPreview = (wishlistDetail.data?.list_items ?? [])
+    .slice(0, 4)
+    .map((it) => (it.issue ? issueToComic(it.issue, { wishlist: true }) : null))
+    .filter((c): c is NonNullable<typeof c> => !!c);
+  const inProgress = entries
+    .filter((e) => e.owned && !e.read)
+    .slice(0, 3)
+    .map((e) => ({ comic: userComicToComic(e)!, progress: 0 }));
+
+  const stats = {
+    owned: entries.filter((e) => e.owned).length,
+    read: entries.filter((e) => e.read).length,
+    wishlist: wishlistDetail.data?.list_items?.length ?? 0,
+    favorites: (favSeries.data?.length ?? 0) + (favPublishers.data?.length ?? 0) + (favCreators.data?.length ?? 0),
+  };
+
+  const displayName = profile.data?.display_name ?? profile.data?.username ?? "collector";
 
   return (
     <div className="space-y-8">
@@ -72,12 +100,12 @@ function Dashboard() {
         <div className="absolute inset-0 opacity-30 mix-blend-overlay" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.5) 1px, transparent 0)", backgroundSize: "8px 8px" }} />
         <div className="relative grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
           <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80">Welcome back, Peter</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80">Welcome back, {displayName}</div>
             <h1 className="font-display mt-1 text-3xl tracking-wide text-white sm:text-5xl">
               {stats.owned} issues in your longbox.
             </h1>
             <p className="mt-2 max-w-lg text-sm text-white/85">
-              Pick up where you left off — you've got {readingProgress.length} comics mid-read and {arrivals.length} new arrivals waiting.
+              Pick up where you left off — you've got {inProgress.length} comics mid-read and {arrivals.length} new arrivals waiting.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -99,28 +127,24 @@ function Dashboard() {
       <section>
         <SectionHeader title="Continue reading" />
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {readingProgress.map(({ comicId, progress }) => {
-            const c = getComic(comicId);
-            if (!c) return null;
-            return (
-              <Link
-                key={comicId}
-                to="/comic/$id"
-                params={{ id: c.id }}
-                className="group flex gap-3 rounded-xl border border-border/60 bg-card/60 p-3 hover:border-primary/40"
-              >
-                <ComicCover comic={c} size="sm" className="w-20 shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium group-hover:text-primary">{c.series} #{c.issue}</div>
-                  <div className="truncate text-xs text-muted-foreground">{c.writers[0]}</div>
-                  <div className="mt-3">
-                    <Progress value={progress} className="h-1.5" />
-                    <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">{progress}% read</div>
-                  </div>
+          {inProgress.map(({ comic: c, progress }) => (
+            <Link
+              key={c.id}
+              to="/comic/$id"
+              params={{ id: c.id }}
+              className="group flex gap-3 rounded-xl border border-border/60 bg-card/60 p-3 hover:border-primary/40"
+            >
+              <ComicCover comic={c} size="sm" className="w-20 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium group-hover:text-primary">{c.series} #{c.issue}</div>
+                <div className="truncate text-xs text-muted-foreground">{c.writers[0]}</div>
+                <div className="mt-3">
+                  <Progress value={progress} className="h-1.5" />
+                  <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">{progress}% read</div>
                 </div>
-              </Link>
-            );
-          })}
+              </div>
+            </Link>
+          ))}
         </div>
       </section>
 
@@ -153,7 +177,7 @@ function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              {wishlist.map((c) => (
+              {wishlistPreview.map((c) => (
                 <ComicCard key={c.id} comic={c} compact />
               ))}
             </div>
@@ -164,9 +188,9 @@ function Dashboard() {
           <Card className="border-border/60">
             <CardHeader><CardTitle className="text-sm uppercase tracking-widest text-muted-foreground">Favorite series</CardTitle></CardHeader>
             <CardContent className="space-y-2">
-              {favoriteSeries.map((s) => (
-                <div key={s} className="flex items-center justify-between text-sm">
-                  <span className="truncate">{s}</span>
+              {(favSeries.data ?? []).map((s) => (
+                <div key={s.id} className="flex items-center justify-between text-sm">
+                  <span className="truncate">{s.name}</span>
                   <TrendingUp className="h-3.5 w-3.5 text-primary" />
                 </div>
               ))}
@@ -175,18 +199,15 @@ function Dashboard() {
           <Card className="border-border/60">
             <CardHeader><CardTitle className="text-sm uppercase tracking-widest text-muted-foreground">Favorite publishers</CardTitle></CardHeader>
             <CardContent className="flex flex-wrap gap-2">
-              {favoritePublishers.map((p) => (
-                <span key={p} className="rounded-md border border-border bg-muted/40 px-2 py-1 text-xs">{p}</span>
+              {(favPublishers.data ?? []).map((p) => (
+                <span key={p.id} className="rounded-md border border-border bg-muted/40 px-2 py-1 text-xs">{p.name}</span>
               ))}
             </CardContent>
           </Card>
           <Card className="border-border/60">
             <CardHeader><CardTitle className="text-sm uppercase tracking-widest text-muted-foreground">Favorite creators</CardTitle></CardHeader>
             <CardContent className="space-y-1 text-sm">
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">Writers</div>
-              <div className="mb-2 text-sm">{favoriteWriters.join(" · ")}</div>
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">Artists</div>
-              <div className="text-sm">{favoriteArtists.join(" · ")}</div>
+              <div className="text-sm">{(favCreators.data ?? []).map((c) => [c.first_name, c.last_name].filter(Boolean).join(" ")).join(" · ") || "—"}</div>
             </CardContent>
           </Card>
         </div>

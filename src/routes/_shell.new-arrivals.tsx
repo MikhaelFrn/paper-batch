@@ -3,7 +3,9 @@ import { useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { ComicCard, PublisherBadge } from "@/components/comic-card";
 import { Button } from "@/components/ui/button";
-import { comics, publishers } from "@/lib/mock-data";
+import { useRecentIssues } from "@/hooks/useIssues";
+import { usePublishers } from "@/hooks/usePublishers";
+import { issueToComic } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/_shell/new-arrivals")({
   head: () => ({
@@ -19,8 +21,11 @@ export const Route = createFileRoute("/_shell/new-arrivals")({
 
 function NewArrivals() {
   const [pub, setPub] = useState<string | null>(null);
-  const weekly = [...comics]
-    .sort((a, b) => +new Date(b.releaseDate) - +new Date(a.releaseDate))
+  const publishers = usePublishers();
+  const issues = useRecentIssues(60);
+
+  const weekly = (issues.data ?? [])
+    .map((i) => issueToComic(i))
     .filter((c) => (pub ? c.publisher === pub : true));
 
   return (
@@ -32,9 +37,9 @@ function NewArrivals() {
       />
       <div className="mb-6 flex flex-wrap gap-2">
         <Button size="sm" variant={!pub ? "default" : "outline"} onClick={() => setPub(null)}>All</Button>
-        {publishers.map((p) => (
-          <Button key={p} size="sm" variant={pub === p ? "default" : "outline"} onClick={() => setPub(p)}>
-            <PublisherBadge publisher={p} />
+        {(publishers.data ?? []).map((p) => (
+          <Button key={p.id} size="sm" variant={pub === p.name ? "default" : "outline"} onClick={() => setPub(p.name)}>
+            <PublisherBadge publisher={p.name} />
           </Button>
         ))}
       </div>
@@ -42,11 +47,15 @@ function NewArrivals() {
       <div className="mb-4 text-xs uppercase tracking-widest text-muted-foreground">
         Week of {new Date().toLocaleDateString(undefined, { month: "long", day: "numeric" })}
       </div>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
-        {weekly.map((c) => (
-          <ComicCard key={c.id} comic={c} />
-        ))}
-      </div>
+      {issues.isLoading ? (
+        <div className="py-10 text-sm text-muted-foreground">Loading new arrivals…</div>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+          {weekly.map((c) => (
+            <ComicCard key={c.id} comic={c} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

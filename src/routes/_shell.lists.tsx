@@ -3,7 +3,8 @@ import { GripVertical, Lock, Globe, Plus } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { customLists, getComic, publisherAccent } from "@/lib/mock-data";
+import { useMyLists } from "@/hooks/useLists";
+import { getPublisherAccent } from "@/lib/mock-data";
 import {
   Dialog,
   DialogContent,
@@ -31,12 +32,15 @@ export const Route = createFileRoute("/_shell/lists")({
 });
 
 function Lists() {
+  const lists = useMyLists();
+  const rows = lists.data ?? [];
+
   return (
     <div>
       <PageHeader
         eyebrow="Curate"
         title="Custom Lists"
-        description={`${customLists.length} lists · drag & drop to reorder`}
+        description={`${rows.length} lists · drag & drop to reorder`}
         actions={
           <Dialog>
             <DialogTrigger asChild>
@@ -58,22 +62,18 @@ function Lists() {
         }
       />
 
+      {lists.isLoading ? (
+        <div className="py-10 text-sm text-muted-foreground">Loading your lists…</div>
+      ) : (
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {customLists.map((list) => {
-          const preview = list.comicIds.map(getComic).filter(Boolean).slice(0, 4);
+        {rows.map((list) => {
+          const isPublic = list.visibility === "public";
           return (
             <Card key={list.id} className="group cursor-pointer overflow-hidden border-border/60 transition hover:border-primary/40">
-              <div className="relative h-32 w-full" style={{ backgroundImage: publisherAccent[list.coverPublisher] }}>
+              <div className="relative h-32 w-full" style={{ backgroundImage: getPublisherAccent(null) }}>
                 <div className="absolute inset-0 opacity-25 mix-blend-overlay" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.5) 1px, transparent 0)", backgroundSize: "8px 8px" }} />
-                <div className="absolute inset-0 flex items-end gap-1 p-3">
-                  {preview.map((c) => (
-                    <div key={c!.id} className="w-10">
-                      <div className="aspect-[2/3] rounded-sm bg-black/40 shadow-md ring-1 ring-white/10" />
-                    </div>
-                  ))}
-                </div>
                 <span className="absolute right-2 top-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] text-white">
-                  {list.isPublic ? <Globe className="inline h-3 w-3" /> : <Lock className="inline h-3 w-3" />} {list.isPublic ? "Public" : "Private"}
+                  {isPublic ? <Globe className="inline h-3 w-3" /> : <Lock className="inline h-3 w-3" />} {isPublic ? "Public" : "Private"}
                 </span>
                 <GripVertical className="absolute left-2 top-2 h-4 w-4 text-white/60 opacity-0 group-hover:opacity-100" />
               </div>
@@ -81,13 +81,14 @@ function Lists() {
                 <CardTitle className="font-display tracking-wide">{list.name}</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <p className="line-clamp-2 text-sm text-muted-foreground">{list.description}</p>
-                <div className="mt-3 text-xs text-muted-foreground">{list.comicIds.length} comics</div>
+                <p className="line-clamp-2 text-sm text-muted-foreground">{list.description ?? ""}</p>
+                <div className="mt-3 text-xs text-muted-foreground uppercase tracking-wider">{list.type}</div>
               </CardContent>
             </Card>
           );
         })}
       </div>
+      )}
     </div>
   );
 }

@@ -4,7 +4,13 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ComicCard, PublisherBadge } from "@/components/comic-card";
-import { comics, favoriteArtists, favoritePublishers, favoriteSeries, favoriteWriters } from "@/lib/mock-data";
+import {
+  useFavoriteSeries,
+  useFavoritePublishers,
+  useFavoriteCreators,
+} from "@/hooks/useFavorites";
+import { useUserCollection } from "@/hooks/useUserComics";
+import { userComicToComic } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/_shell/favorites")({
   head: () => ({
@@ -19,7 +25,20 @@ export const Route = createFileRoute("/_shell/favorites")({
 });
 
 function Favorites() {
-  const favComics = comics.filter((c) => c.favorite);
+  const favSeries = useFavoriteSeries();
+  const favPublishers = useFavoritePublishers();
+  const favCreators = useFavoriteCreators();
+  const collection = useUserCollection();
+
+  const favComics = (collection.data ?? [])
+    .filter((e) => (e.rating ?? 0) >= 4)
+    .map((e) => userComicToComic(e))
+    .filter((c): c is NonNullable<typeof c> => !!c);
+
+  const writers = (favCreators.data ?? []).filter((c) => (c.api_source ?? "").includes("writer") || true);
+  // The creator role isn't stored on the creator row itself, so show all favorite creators in one list.
+  const artists = writers;
+
   return (
     <div>
       <PageHeader eyebrow="Your taste" title="Favorites" description="Series, publishers, writers, artists, and issues you've starred." />
@@ -34,11 +53,11 @@ function Favorites() {
 
         <TabsContent value="series" className="mt-6">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {favoriteSeries.map((s) => (
-              <Card key={s} className="border-border/60">
+            {(favSeries.data ?? []).map((s) => (
+              <Card key={s.id} className="border-border/60">
                 <CardHeader className="flex-row items-center gap-3">
                   <Heart className="h-5 w-5 fill-primary text-primary" />
-                  <CardTitle className="font-display text-lg tracking-wide">{s}</CardTitle>
+                  <CardTitle className="font-display text-lg tracking-wide">{s.name}</CardTitle>
                 </CardHeader>
               </Card>
             ))}
@@ -47,9 +66,9 @@ function Favorites() {
 
         <TabsContent value="publishers" className="mt-6">
           <div className="flex flex-wrap gap-2">
-            {favoritePublishers.map((p) => (
-              <div key={p} className="rounded-lg border border-border bg-card/60 px-4 py-3">
-                <PublisherBadge publisher={p} />
+            {(favPublishers.data ?? []).map((p) => (
+              <div key={p.id} className="rounded-lg border border-border bg-card/60 px-4 py-3">
+                <PublisherBadge publisher={p.name} />
               </div>
             ))}
           </div>
@@ -57,16 +76,16 @@ function Favorites() {
 
         <TabsContent value="writers" className="mt-6">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {favoriteWriters.map((w) => (
-              <Card key={w} className="border-border/60"><CardContent className="p-4">{w}</CardContent></Card>
+            {writers.map((w) => (
+              <Card key={w.id} className="border-border/60"><CardContent className="p-4">{[w.first_name, w.last_name].filter(Boolean).join(" ")}</CardContent></Card>
             ))}
           </div>
         </TabsContent>
 
         <TabsContent value="artists" className="mt-6">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {favoriteArtists.map((a) => (
-              <Card key={a} className="border-border/60"><CardContent className="p-4">{a}</CardContent></Card>
+            {artists.map((a) => (
+              <Card key={a.id} className="border-border/60"><CardContent className="p-4">{[a.first_name, a.last_name].filter(Boolean).join(" ")}</CardContent></Card>
             ))}
           </div>
         </TabsContent>
