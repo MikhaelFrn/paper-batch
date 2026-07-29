@@ -71,7 +71,7 @@ function Profile() {
 
   const displayName = profile.data?.display_name ?? profile.data?.username ?? "";
   const username = profile.data?.username ?? "";
-  const email = profile.data?.email ?? "";
+  const email = "";
 
   return (
     <div>
