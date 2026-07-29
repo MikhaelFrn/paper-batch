@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { publisherAccent, type Comic } from "@/lib/mock-data";
+import { getPublisherAccent, type Comic } from "@/lib/mock-data";
 
 interface Props {
   comic: Comic;
@@ -16,7 +16,7 @@ const sizes = {
 
 // Stylised faux comic cover — self-contained, no external image assets.
 export function ComicCover({ comic, className, size = "md" }: Props) {
-  const gradient = publisherAccent[comic.publisher];
+  const gradient = getPublisherAccent(comic.publisher);
   return (
     <div
       className={cn(
