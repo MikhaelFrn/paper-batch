@@ -1,4 +1,4 @@
-// Generated-style Database type for the Longbox schema.
+// Generated-style Database type for the Comic vault schema.
 // Mirrors the PostgreSQL schema; used as the single source of truth for
 // row / insert / update types across the app.
 
@@ -10,8 +10,13 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-export type ListType = "custom" | "reading" | "wishlist" | "favorites";
-export type ListVisibility = "private" | "public" | "unlisted";
+// Verified live against the real DB (not just the schema doc): both
+// "favorites" and "unlisted" were previously listed here but don't exist
+// as enum values in Postgres — inserting them fails with 22P02. Favorites
+// are their own tables (favorite_series/creators/publishers/runs), not a
+// list type.
+export type ListType = "custom" | "reading" | "wishlist";
+export type ListVisibility = "private" | "shared" | "public";
 export type ListMemberRole = "owner" | "editor" | "viewer";
 
 export type RunType =

@@ -2,12 +2,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, BookOpen, Bookmark, Heart, Library, Sparkles, TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { ComicCard } from "@/components/comic-card";
-import { ComicCover } from "@/components/comic-cover";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { useUserCollection } from "@/hooks/useUserComics";
-import { useRecentIssues } from "@/hooks/useIssues";
+import { useNewArrivals } from "@/hooks/useComicVine";
 import {
   useFavoriteSeries,
   useFavoritePublishers,
@@ -15,15 +13,14 @@ import {
 } from "@/hooks/useFavorites";
 import { useMyLists, useList } from "@/hooks/useLists";
 import { useMyProfile } from "@/hooks/useProfiles";
-import { issueToComic, userComicToComic } from "@/lib/mock-data";
-
+import { cvIssueToComic, issueToComic, userComicToComic } from "@/lib/comic-adapters";
 export const Route = createFileRoute("/_shell/")({
   head: () => ({
     meta: [
-      { title: "Dashboard · Longbox" },
+      { title: "Dashboard · Comic Vault" },
       { name: "description", content: "Your comic collection at a glance — new arrivals, continue reading, wishlist, and stats." },
-      { property: "og:title", content: "Longbox — Your comic collection HQ" },
-      { property: "og:description", content: "Track, discover, and organize every issue in your longbox." },
+      { property: "og:title", content: "Comic Vault — Your comic collection HQ" },
+      { property: "og:description", content: "Track, discover, and organize every issue in your vault." },
     ],
   }),
   component: Dashboard,
@@ -61,7 +58,7 @@ function SectionHeader({ title, to }: { title: string; to?: string }) {
 function Dashboard() {
   const profile = useMyProfile();
   const collection = useUserCollection();
-  const recentIssues = useRecentIssues(6);
+  const newArrivals = useNewArrivals();
   const favSeries = useFavoriteSeries();
   const favPublishers = useFavoritePublishers();
   const favCreators = useFavoriteCreators();
@@ -69,20 +66,19 @@ function Dashboard() {
   const wishlistList = lists.data?.find((l) => l.type === "wishlist");
   const wishlistDetail = useList(wishlistList?.id);
 
+
   const entries = collection.data ?? [];
   const recent = entries
     .slice(0, 6)
     .map((e) => userComicToComic(e))
     .filter((c): c is NonNullable<typeof c> => !!c);
-  const arrivals = (recentIssues.data ?? []).map((i) => issueToComic(i));
+  const arrivals = (newArrivals.data ?? [])
+    .slice(0, 6)
+    .map((i) => cvIssueToComic(i, i.publisherName));
   const wishlistPreview = (wishlistDetail.data?.list_items ?? [])
     .slice(0, 4)
     .map((it) => (it.issue ? issueToComic(it.issue, { wishlist: true }) : null))
     .filter((c): c is NonNullable<typeof c> => !!c);
-  const inProgress = entries
-    .filter((e) => e.owned && !e.read)
-    .slice(0, 3)
-    .map((e) => ({ comic: userComicToComic(e)!, progress: 0 }));
 
   const stats = {
     owned: entries.filter((e) => e.owned).length,
@@ -102,10 +98,10 @@ function Dashboard() {
           <div className="min-w-0">
             <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80">Welcome back, {displayName}</div>
             <h1 className="font-display mt-1 text-3xl tracking-wide text-white sm:text-5xl">
-              {stats.owned} issues in your longbox.
+              {stats.owned} issues in your vault.
             </h1>
             <p className="mt-2 max-w-lg text-sm text-white/85">
-              Pick up where you left off — you've got {inProgress.length} comics mid-read and {arrivals.length} new arrivals waiting.
+              You've got {arrivals.length} new arrivals waiting this week.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -122,31 +118,6 @@ function Dashboard() {
         <StatCard icon={Bookmark} label="Wishlist" value={stats.wishlist} tone="bg-gold/15 text-gold" />
         <StatCard icon={Heart} label="Favorites" value={stats.favorites} tone="bg-emerald-500/15 text-emerald-400" />
       </div>
-
-      {/* Continue reading */}
-      <section>
-        <SectionHeader title="Continue reading" />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {inProgress.map(({ comic: c, progress }) => (
-            <Link
-              key={c.id}
-              to="/comic/$id"
-              params={{ id: c.id }}
-              className="group flex gap-3 rounded-xl border border-border/60 bg-card/60 p-3 hover:border-primary/40"
-            >
-              <ComicCover comic={c} size="sm" className="w-20 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium group-hover:text-primary">{c.series} #{c.issue}</div>
-                <div className="truncate text-xs text-muted-foreground">{c.writers[0]}</div>
-                <div className="mt-3">
-                  <Progress value={progress} className="h-1.5" />
-                  <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">{progress}% read</div>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
 
       {/* Recently added */}
       <section>
@@ -173,7 +144,13 @@ function Dashboard() {
         <Card className="border-border/60 lg:col-span-2">
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle className="font-display tracking-wide">Wishlist preview</CardTitle>
-            <Link to="/wishlist" className="text-xs text-muted-foreground hover:text-primary">Manage</Link>
+            <Link
+              to={wishlistList ? "/lists/$id" : "/lists"}
+              params={wishlistList ? { id: wishlistList.id } : undefined}
+              className="text-xs text-muted-foreground hover:text-primary"
+            >
+              Manage
+            </Link>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

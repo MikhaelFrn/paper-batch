@@ -14,20 +14,19 @@ export function AuthShell({ title, subtitle, children, footer }: { title: string
             <div className="grid h-10 w-10 place-items-center rounded-md bg-black/40">
               <Zap className="h-5 w-5" />
             </div>
-            <div className="font-display text-2xl tracking-wide">LONGBOX</div>
+            <div className="font-display text-2xl tracking-wide">Comic Vault</div>
           </Link>
           <div>
-            <div className="font-display text-5xl leading-none tracking-wide">Every issue.<br />One longbox.</div>
+            <div className="font-display text-5xl leading-none tracking-wide">Every issue.<br />One place for all your comics.</div>
             <p className="mt-4 max-w-md text-white/85">Track your collection, hunt down wishlist grails, and discover what's dropping this Wednesday — all in one place.</p>
           </div>
-          <div className="text-xs uppercase tracking-[0.3em] text-white/70">Powered by ComicVine · Marvel · DC · LOCG</div>
         </div>
       </div>
       <div className="flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
           <Link to="/" className="mb-8 flex items-center gap-2 lg:hidden">
             <div className="grid h-9 w-9 place-items-center rounded-md bg-primary"><Zap className="h-4 w-4 text-primary-foreground" /></div>
-            <span className="font-display text-xl tracking-wide">LONGBOX</span>
+            <span className="font-display text-xl tracking-wide">Comic Vault</span>
           </Link>
           <h1 className="font-display text-3xl tracking-wide">{title}</h1>
           <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>

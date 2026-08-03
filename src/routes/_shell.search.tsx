@@ -1,19 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search as SearchIcon } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { ComicCard, PublisherBadge } from "@/components/comic-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { useSearch } from "@/hooks/useSearch";
-import { issueToComic } from "@/lib/mock-data";
+import { useComicVineSearch, useLoadMoreComicVineIssues } from "@/hooks/useComicVine";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { issueToComic, cvIssueToComic } from "@/lib/comic-adapters";
+import type { CvSearchIssue } from "@/integrations/comicvine/types";
 
 export const Route = createFileRoute("/_shell/search")({
   head: () => ({
     meta: [
-      { title: "Search · Longbox" },
+      { title: "Search · Comic Vault" },
       { name: "description", content: "Search comics, series, runs, writers, artists, publishers, characters, and teams." },
-      { property: "og:title", content: "Search comics — Longbox" },
+      { property: "og:title", content: "Search comics — Comic Vault" },
       { property: "og:description", content: "Find any issue, creator, or character in one search." },
     ],
   }),
@@ -22,8 +27,88 @@ export const Route = createFileRoute("/_shell/search")({
 
 function SearchPage() {
   const [q, setQ] = useState("");
-  const search = useSearch(q, { limit: 20 });
+  const debouncedQ = useDebouncedValue(q, 400);
+  const search = useSearch(debouncedQ, { limit: 20 });
+  const cvSearch = useComicVineSearch(debouncedQ);
   const data = search.data;
+
+  // "Load more" pages further into the same matched volumes the search
+  // already found (see sampledVolumeIds), accumulating on top of the
+  // initial batch. `offset` is only ever set explicitly (on a fresh query,
+  // or after a successful load-more) — it must NOT be re-derived from
+  // cvSearch.data via an effect, since React Query can refetch that query
+  // in the background (window refocus, staleness) and a fresh `data`
+  // reference would silently reset offset back to the start, discarding
+  // any "Load more" progress already made.
+  const [moreIssues, setMoreIssues] = useState<CvSearchIssue[]>([]);
+  const [offset, setOffset] = useState<number | null>(null);
+  const [exhausted, setExhausted] = useState(false);
+  const loadMore = useLoadMoreComicVineIssues();
+  const effectiveOffset = offset ?? cvSearch.data?.nextOffset ?? 0;
+
+  useEffect(() => {
+    setMoreIssues([]);
+    setOffset(null);
+    setExhausted(false);
+  }, [debouncedQ]);
+
+  // ComicVine results already present locally (by comicvine_id) are dropped
+  // in favor of the richer local row — the local one already has relations
+  // and (if owned) collection state; the CV one is a bare search hit.
+  const localIssueCvIds = useMemo(
+    () => new Set((data?.issues ?? []).map((i) => i.comicvine_id).filter((id): id is number => id != null)),
+    [data?.issues],
+  );
+  const localVolumeCvIds = useMemo(
+    () => new Set((data?.volumes ?? []).map((v) => v.comicvine_id).filter((id): id is number => id != null)),
+    [data?.volumes],
+  );
+
+  const allCvIssues = useMemo(
+    () => [...(cvSearch.data?.issues ?? []), ...moreIssues],
+    [cvSearch.data?.issues, moreIssues],
+  );
+
+  const issueComics = useMemo(() => {
+    const local = (data?.issues ?? []).map((i) => issueToComic(i));
+    const seen = new Set<number>();
+    const fromCv = [];
+    for (const i of allCvIssues) {
+      if (localIssueCvIds.has(i.id) || seen.has(i.id)) continue;
+      seen.add(i.id);
+      fromCv.push(cvIssueToComic(i));
+    }
+    return [...local, ...fromCv];
+  }, [data?.issues, allCvIssues, localIssueCvIds]);
+
+  const cvVolumesOnly = useMemo(
+    () => (cvSearch.data?.volumes ?? []).filter((v) => !localVolumeCvIds.has(v.id)),
+    [cvSearch.data?.volumes, localVolumeCvIds],
+  );
+
+  const sampledVolumeIds = cvSearch.data?.sampledVolumeIds ?? [];
+  const canLoadMore = sampledVolumeIds.length > 0 && !exhausted;
+
+  const handleLoadMore = () => {
+    loadMore.mutate(
+      { volumeIds: sampledVolumeIds, offset: effectiveOffset },
+      {
+        onSuccess: (result) => {
+          setMoreIssues((prev) => [...prev, ...result.issues]);
+          setOffset(result.nextOffset);
+          if (result.issues.length === 0) {
+            setExhausted(true);
+            toast.info("No more issues to load for this search.");
+          } else {
+            toast.success(`Added ${result.issues.length} more issue${result.issues.length === 1 ? "" : "s"}.`);
+          }
+        },
+        onError: () => {
+          toast.error("Couldn't load more issues from ComicVine.");
+        },
+      },
+    );
+  };
 
   const Group = ({ title, children, count }: { title: string; children: React.ReactNode; count: number }) =>
     count === 0 ? null : (
@@ -47,10 +132,17 @@ function SearchPage() {
         <p className="text-sm text-muted-foreground">Searching…</p>
       ) : !data ? null : (
         <>
-          <Group title="Comics" count={data.issues.length}>
+          <Group title="Comics" count={issueComics.length}>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
-              {data.issues.map((i) => <ComicCard key={i.id} comic={issueToComic(i)} />)}
+              {issueComics.map((c) => <ComicCard key={c.id} comic={c} />)}
             </div>
+            {canLoadMore && (
+              <div className="mt-4 flex justify-center">
+                <Button variant="outline" onClick={handleLoadMore} disabled={loadMore.isPending}>
+                  {loadMore.isPending ? "Loading…" : "Load more"}
+                </Button>
+              </div>
+            )}
           </Group>
           <Group title="Series" count={data.series.length}>
             <div className="flex flex-wrap gap-2">{data.series.map((s) => <Card key={s.id} className="border-border/60"><CardContent className="p-3 text-sm">{s.name}</CardContent></Card>)}</div>
@@ -58,8 +150,11 @@ function SearchPage() {
           <Group title="Runs" count={data.runs.length}>
             <div className="flex flex-wrap gap-2">{data.runs.map((r) => <span key={r.id} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm">{r.name}</span>)}</div>
           </Group>
-          <Group title="Volumes" count={data.volumes.length}>
-            <div className="flex flex-wrap gap-2">{data.volumes.map((v) => <span key={v.id} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm">{v.name}</span>)}</div>
+          <Group title="Volumes" count={data.volumes.length + cvVolumesOnly.length}>
+            <div className="flex flex-wrap gap-2">
+              {data.volumes.map((v) => <span key={v.id} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm">{v.name}</span>)}
+              {cvVolumesOnly.map((v) => <span key={`cv-${v.id}`} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm">{v.name}{v.start_year ? ` (${v.start_year})` : ""}</span>)}
+            </div>
           </Group>
           <Group title="Creators" count={data.creators.length}>
             <div className="flex flex-wrap gap-2">{data.creators.map((c) => <span key={c.id} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm">{[c.first_name, c.last_name].filter(Boolean).join(" ")}</span>)}</div>

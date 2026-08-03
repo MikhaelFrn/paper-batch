@@ -1,19 +1,34 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Bookmark, BookOpen, Heart, Star } from "lucide-react";
+import { toast } from "sonner";
 import { ComicCover } from "./comic-cover";
 import { Badge } from "@/components/ui/badge";
-import type { Comic } from "@/lib/mock-data";
+import type { Comic } from "@/lib/comic-adapters";
 import { cn } from "@/lib/utils";
+import { useImportComicVineIssue } from "@/hooks/useComicVine";
 
-export function ComicCard({ comic, compact = false }: { comic: Comic; compact?: boolean }) {
+function formatYear(releaseDate: string): number | null {
+  if (!releaseDate) return null;
+  const year = new Date(releaseDate).getFullYear();
+  return Number.isFinite(year) ? year : null;
+}
+
+function ComicCardBody({
+  comic,
+  compact,
+  extraBadge,
+}: {
+  comic: Comic;
+  compact: boolean;
+  extraBadge?: React.ReactNode;
+}) {
   return (
-    <Link
-      to="/comic/$id"
-      params={{ id: comic.id }}
-      className="group block space-y-2 outline-none"
-    >
+    <>
       <div className="relative">
         <ComicCover comic={comic} size={compact ? "sm" : "md"} className="transition-transform duration-300 group-hover:-translate-y-1 group-hover:shadow-2xl" />
+        {extraBadge && (
+          <div className="pointer-events-none absolute left-1.5 top-1.5">{extraBadge}</div>
+        )}
         <div className="pointer-events-none absolute right-1.5 top-1.5 flex flex-col gap-1">
           {comic.favorite && (
             <span className="grid h-6 w-6 place-items-center rounded-full bg-black/70 text-primary">
@@ -40,9 +55,81 @@ export function ComicCard({ comic, compact = false }: { comic: Comic; compact?: 
           {comic.series} #{comic.issue}
         </div>
         <div className={cn("truncate text-xs text-muted-foreground", compact && "hidden")}>
-          {comic.writers[0]} · {new Date(comic.releaseDate).getFullYear()}
+          {comic.writers[0]}
+          {formatYear(comic.releaseDate) ? ` · ${formatYear(comic.releaseDate)}` : ""}
         </div>
       </div>
+    </>
+  );
+}
+
+/** A ComicVine result not yet in the catalog — clicking imports it (see
+ * services/comicvine.ts) and navigates to the newly created issue. */
+function UnimportedComicCard({
+  comic,
+  compact,
+  detailUrl,
+}: {
+  comic: Comic;
+  compact: boolean;
+  detailUrl: string;
+}) {
+  const navigate = useNavigate();
+  const importIssue = useImportComicVineIssue();
+
+  const handleImport = () => {
+    if (importIssue.isPending) return;
+    importIssue.mutate(
+      { detailUrl },
+      {
+        onSuccess: ({ issueId }) => {
+          navigate({ to: "/comic/$id", params: { id: issueId } });
+        },
+        onError: () => {
+          toast.error("Couldn't import this issue from ComicVine.");
+        },
+      },
+    );
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleImport}
+      disabled={importIssue.isPending}
+      className="group block w-full space-y-2 text-left outline-none disabled:opacity-60"
+    >
+      <ComicCardBody
+        comic={comic}
+        compact={compact}
+        extraBadge={
+          <Badge className="h-5 border-0 bg-sky-600/90 px-1.5 text-[9px] text-white">
+            {importIssue.isPending ? "Adding…" : "ComicVine"}
+          </Badge>
+        }
+      />
+    </button>
+  );
+}
+
+export function ComicCard({ comic, compact = false }: { comic: Comic; compact?: boolean }) {
+  if (comic.comicVineDetailUrl) {
+    return (
+      <UnimportedComicCard
+        comic={comic}
+        compact={compact}
+        detailUrl={comic.comicVineDetailUrl}
+      />
+    );
+  }
+
+  return (
+    <Link
+      to="/comic/$id"
+      params={{ id: comic.id }}
+      className="group block space-y-2 outline-none"
+    >
+      <ComicCardBody comic={comic} compact={compact} />
     </Link>
   );
 }

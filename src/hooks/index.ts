@@ -13,3 +13,4 @@ export * from "./useUserComics";
 export * from "./useFavorites";
 export * from "./useLists";
 export * from "./useSearch";
+export * from "./useComicVine";

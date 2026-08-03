@@ -19,14 +19,14 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { useUserCollection } from "@/hooks/useUserComics";
 import { usePublishers } from "@/hooks/usePublishers";
 import { useSeriesList } from "@/hooks/useSeries";
-import { userComicToComic } from "@/lib/mock-data";
+import { userComicToComic } from "@/lib/comic-adapters";
 
 export const Route = createFileRoute("/_shell/inventory")({
   head: () => ({
     meta: [
-      { title: "Inventory · Longbox" },
+      { title: "Inventory · Comic Vault" },
       { name: "description", content: "Browse, filter, and sort your entire comic collection." },
-      { property: "og:title", content: "Your comic inventory — Longbox" },
+      { property: "og:title", content: "Your comic inventory — Comic Vault" },
       { property: "og:description", content: "Every issue you own, read, or want, in one clean library." },
     ],
   }),
@@ -145,7 +145,7 @@ function Inventory() {
   return (
     <div>
       <PageHeader
-        eyebrow="Your Longbox"
+        eyebrow="Your Comic Vault"
         title="Inventory"
         description={`${filtered.length} of ${allComics.length} issues`}
         actions={

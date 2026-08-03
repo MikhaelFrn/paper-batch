@@ -12,8 +12,11 @@ import { unwrap } from "./_utils";
 
 const ISSUE_WITH_RELATIONS =
   "*, volume:volumes(*, series:series(*, publisher:publishers(*))), issue_creators(role, creator:creators(*))" as const;
+// `runs` has no direct FK to `series` — a run relates to volumes/issues only
+// indirectly through `run_items`. Don't join a relationship that doesn't
+// exist in the schema.
 const RUN_WITH_RELATIONS =
-  "*, series:series(*, publisher:publishers(*)), run_creators(role, creator:creators(*))" as const;
+  "*, run_creators(role, creator:creators(*))" as const;
 const SERIES_WITH_PUBLISHER = "*, publisher:publishers(*)" as const;
 
 function esc(q: string): string {

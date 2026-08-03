@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PublisherBadge } from "@/components/comic-card";
-import { useMyProfile } from "@/hooks/useProfiles";
+import { useMyProfile, useUpdateMyProfile } from "@/hooks/useProfiles";
 import { useUserCollection } from "@/hooks/useUserComics";
 import {
   useFavoriteSeries,
@@ -15,13 +15,17 @@ import {
   useFavoriteCreators,
 } from "@/hooks/useFavorites";
 import { useMyLists, useList } from "@/hooks/useLists";
+import { toast } from "sonner";
+import { useNavigate } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
+import { getCurrentUser, updateAuthUser } from "@/services/auth";
 
 export const Route = createFileRoute("/_shell/profile")({
   head: () => ({
     meta: [
-      { title: "Profile · Longbox" },
-      { name: "description", content: "Manage your Longbox profile and collection stats." },
-      { property: "og:title", content: "My profile — Longbox" },
+      { title: "Profile · Comic Vault" },
+      { name: "description", content: "Manage your Comic Vault profile and collection stats." },
+      { property: "og:title", content: "My profile — Comic Vault" },
       { property: "og:description", content: "Edit your details and see your collection at a glance." },
     ],
   }),
@@ -48,6 +52,8 @@ function initials(name: string): string {
 
 function Profile() {
   const profile = useMyProfile();
+  const navigate = useNavigate();
+  const update = useUpdateMyProfile();
   const collection = useUserCollection();
   const favSeries = useFavoriteSeries();
   const favPublishers = useFavoritePublishers();
@@ -55,6 +61,29 @@ function Profile() {
   const lists = useMyLists();
   const wishlistList = lists.data?.find((l) => l.type === "wishlist");
   const wishlistDetail = useList(wishlistList?.id);
+  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const handleCancel = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    e.preventDefault();
+    navigate({ to: "/profile" });
+  }
+  const handleClick = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    e.preventDefault();
+      try {
+        await update.mutateAsync({
+          username,
+          display_name: displayName,
+        });
+        await updateAuthUser({
+          email,
+        });
+        toast.success("Information updated!");
+        navigate({ to: "/profile" });
+        } catch (error) {
+          toast.error("Invalid info provided.");
+        }
+  }
 
   const entries = collection.data ?? [];
   const stats = {
@@ -69,9 +98,19 @@ function Profile() {
     totalIssues: entries.length,
   };
 
-  const displayName = profile.data?.display_name ?? profile.data?.username ?? "";
-  const username = profile.data?.username ?? "";
-  const email = "";
+  useEffect(() => {
+    if (profile.data) {
+      setDisplayName(profile.data?.display_name ?? profile.data?.username ?? "");
+      setUsername(profile.data?.username ?? "");
+    }
+  }, [profile.data]);
+  useEffect(() => {
+    const loadUser = async () => {
+      const user = await getCurrentUser();
+      setEmail(user?.email ?? "");
+    };
+    loadUser();
+  }, []);
 
   return (
     <div>
@@ -99,14 +138,23 @@ function Profile() {
           <Card className="border-border/60">
             <CardHeader><CardTitle>Account details</CardTitle></CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
-              <div><Label>Username</Label><Input defaultValue={username} /></div>
-              <div><Label>Display name</Label><Input defaultValue={displayName} /></div>
-              <div className="sm:col-span-2"><Label>Email</Label><Input defaultValue={email} /></div>
-              <div><Label>New password</Label><Input type="password" placeholder="••••••••" /></div>
-              <div><Label>Confirm password</Label><Input type="password" placeholder="••••••••" /></div>
+              <div><Label>Username</Label><Input value={username} onChange={(e) => setUsername(e.target.value)}/></div>
+              <div><Label>Display name</Label><Input value={displayName} onChange={(e) => setDisplayName(e.target.value)}/></div>
+              <div className="sm:col-span-2"><Label>Email</Label><Input value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+              <div className="sm:col-span-2">
+                <Label>Password</Label>
+                <div className="mt-2 flex items-center justify-between rounded-md border border-border p-3">
+                  <span className="text-sm text-muted-foreground">
+                    Reset your password via email.
+                  </span>
+                  <Button type="button" variant="outline" onClick={() => navigate({ to: "/forgot-password" })}>
+                    Reset password
+                  </Button>
+                </div>
+              </div>
               <div className="sm:col-span-2 flex justify-end gap-2">
-                <Button variant="outline">Cancel</Button>
-                <Button>Save changes</Button>
+                <Button variant="outline" onClick={(e) => handleCancel(e)}>Cancel</Button>
+                <Button hover:brightness-1="true" onClick={(e) => handleClick(e)}>Save changes</Button>
               </div>
             </CardContent>
           </Card>

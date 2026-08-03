@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { getPublisherAccent, type Comic } from "@/lib/mock-data";
+import { getPublisherAccent, type Comic } from "@/lib/comic-adapters";
 
 interface Props {
   comic: Comic;

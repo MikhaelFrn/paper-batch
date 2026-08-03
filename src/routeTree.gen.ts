@@ -9,30 +9,24 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SignupRouteImport } from './routes/signup'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as ShellRouteImport } from './routes/_shell'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ShellIndexRouteImport } from './routes/_shell.index'
-import { Route as ShellWishlistRouteImport } from './routes/_shell.wishlist'
-import { Route as ShellSettingsRouteImport } from './routes/_shell.settings'
-import { Route as ShellSearchRouteImport } from './routes/_shell.search'
-import { Route as ShellReadingListRouteImport } from './routes/_shell.reading-list'
-import { Route as ShellProfileRouteImport } from './routes/_shell.profile'
-import { Route as ShellNewArrivalsRouteImport } from './routes/_shell.new-arrivals'
-import { Route as ShellListsRouteImport } from './routes/_shell.lists'
-import { Route as ShellInventoryRouteImport } from './routes/_shell.inventory'
 import { Route as ShellFavoritesRouteImport } from './routes/_shell.favorites'
+import { Route as ShellInventoryRouteImport } from './routes/_shell.inventory'
+import { Route as ShellListsRouteImport } from './routes/_shell.lists'
+import { Route as ShellNewArrivalsRouteImport } from './routes/_shell.new-arrivals'
+import { Route as ShellProfileRouteImport } from './routes/_shell.profile'
+import { Route as ShellSearchRouteImport } from './routes/_shell.search'
+import { Route as ShellSettingsRouteImport } from './routes/_shell.settings'
 import { Route as ShellComicIdRouteImport } from './routes/_shell.comic.$id'
+import { Route as ShellListsIdRouteImport } from './routes/_shell.lists_.$id'
 
-const SignupRoute = SignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+const ShellRoute = ShellRouteImport.update({
+  id: '/_shell',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
@@ -40,8 +34,19 @@ const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ShellRoute = ShellRouteImport.update({
-  id: '/_shell',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShellIndexRoute = ShellIndexRouteImport.update({
@@ -49,39 +54,9 @@ const ShellIndexRoute = ShellIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ShellRoute,
 } as any)
-const ShellWishlistRoute = ShellWishlistRouteImport.update({
-  id: '/wishlist',
-  path: '/wishlist',
-  getParentRoute: () => ShellRoute,
-} as any)
-const ShellSettingsRoute = ShellSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => ShellRoute,
-} as any)
-const ShellSearchRoute = ShellSearchRouteImport.update({
-  id: '/search',
-  path: '/search',
-  getParentRoute: () => ShellRoute,
-} as any)
-const ShellReadingListRoute = ShellReadingListRouteImport.update({
-  id: '/reading-list',
-  path: '/reading-list',
-  getParentRoute: () => ShellRoute,
-} as any)
-const ShellProfileRoute = ShellProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => ShellRoute,
-} as any)
-const ShellNewArrivalsRoute = ShellNewArrivalsRouteImport.update({
-  id: '/new-arrivals',
-  path: '/new-arrivals',
-  getParentRoute: () => ShellRoute,
-} as any)
-const ShellListsRoute = ShellListsRouteImport.update({
-  id: '/lists',
-  path: '/lists',
+const ShellFavoritesRoute = ShellFavoritesRouteImport.update({
+  id: '/favorites',
+  path: '/favorites',
   getParentRoute: () => ShellRoute,
 } as any)
 const ShellInventoryRoute = ShellInventoryRouteImport.update({
@@ -89,9 +64,29 @@ const ShellInventoryRoute = ShellInventoryRouteImport.update({
   path: '/inventory',
   getParentRoute: () => ShellRoute,
 } as any)
-const ShellFavoritesRoute = ShellFavoritesRouteImport.update({
-  id: '/favorites',
-  path: '/favorites',
+const ShellListsRoute = ShellListsRouteImport.update({
+  id: '/lists',
+  path: '/lists',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellNewArrivalsRoute = ShellNewArrivalsRouteImport.update({
+  id: '/new-arrivals',
+  path: '/new-arrivals',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellProfileRoute = ShellProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellSearchRoute = ShellSearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellSettingsRoute = ShellSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => ShellRoute,
 } as any)
 const ShellComicIdRoute = ShellComicIdRouteImport.update({
@@ -99,56 +94,61 @@ const ShellComicIdRoute = ShellComicIdRouteImport.update({
   path: '/comic/$id',
   getParentRoute: () => ShellRoute,
 } as any)
+const ShellListsIdRoute = ShellListsIdRouteImport.update({
+  id: '/lists_/$id',
+  path: '/lists/$id',
+  getParentRoute: () => ShellRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof ShellIndexRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/favorites': typeof ShellFavoritesRoute
   '/inventory': typeof ShellInventoryRoute
   '/lists': typeof ShellListsRoute
   '/new-arrivals': typeof ShellNewArrivalsRoute
   '/profile': typeof ShellProfileRoute
-  '/reading-list': typeof ShellReadingListRoute
   '/search': typeof ShellSearchRoute
   '/settings': typeof ShellSettingsRoute
-  '/wishlist': typeof ShellWishlistRoute
   '/comic/$id': typeof ShellComicIdRoute
+  '/lists/$id': typeof ShellListsIdRoute
 }
 export interface FileRoutesByTo {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/favorites': typeof ShellFavoritesRoute
   '/inventory': typeof ShellInventoryRoute
   '/lists': typeof ShellListsRoute
   '/new-arrivals': typeof ShellNewArrivalsRoute
   '/profile': typeof ShellProfileRoute
-  '/reading-list': typeof ShellReadingListRoute
   '/search': typeof ShellSearchRoute
   '/settings': typeof ShellSettingsRoute
-  '/wishlist': typeof ShellWishlistRoute
   '/': typeof ShellIndexRoute
   '/comic/$id': typeof ShellComicIdRoute
+  '/lists/$id': typeof ShellListsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_shell': typeof ShellRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/_shell/favorites': typeof ShellFavoritesRoute
   '/_shell/inventory': typeof ShellInventoryRoute
   '/_shell/lists': typeof ShellListsRoute
   '/_shell/new-arrivals': typeof ShellNewArrivalsRoute
   '/_shell/profile': typeof ShellProfileRoute
-  '/_shell/reading-list': typeof ShellReadingListRoute
   '/_shell/search': typeof ShellSearchRoute
   '/_shell/settings': typeof ShellSettingsRoute
-  '/_shell/wishlist': typeof ShellWishlistRoute
   '/_shell/': typeof ShellIndexRoute
   '/_shell/comic/$id': typeof ShellComicIdRoute
+  '/_shell/lists_/$id': typeof ShellListsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -156,73 +156,67 @@ export interface FileRouteTypes {
     | '/'
     | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/signup'
     | '/favorites'
     | '/inventory'
     | '/lists'
     | '/new-arrivals'
     | '/profile'
-    | '/reading-list'
     | '/search'
     | '/settings'
-    | '/wishlist'
     | '/comic/$id'
+    | '/lists/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/signup'
     | '/favorites'
     | '/inventory'
     | '/lists'
     | '/new-arrivals'
     | '/profile'
-    | '/reading-list'
     | '/search'
     | '/settings'
-    | '/wishlist'
     | '/'
     | '/comic/$id'
+    | '/lists/$id'
   id:
     | '__root__'
     | '/_shell'
     | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/signup'
     | '/_shell/favorites'
     | '/_shell/inventory'
     | '/_shell/lists'
     | '/_shell/new-arrivals'
     | '/_shell/profile'
-    | '/_shell/reading-list'
     | '/_shell/search'
     | '/_shell/settings'
-    | '/_shell/wishlist'
     | '/_shell/'
     | '/_shell/comic/$id'
+    | '/_shell/lists_/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   ShellRoute: typeof ShellRouteWithChildren
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/signup': {
-      id: '/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
+    '/_shell': {
+      id: '/_shell'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof ShellRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/forgot-password': {
@@ -232,11 +226,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_shell': {
-      id: '/_shell'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof ShellRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_shell/': {
@@ -246,53 +254,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellIndexRouteImport
       parentRoute: typeof ShellRoute
     }
-    '/_shell/wishlist': {
-      id: '/_shell/wishlist'
-      path: '/wishlist'
-      fullPath: '/wishlist'
-      preLoaderRoute: typeof ShellWishlistRouteImport
-      parentRoute: typeof ShellRoute
-    }
-    '/_shell/settings': {
-      id: '/_shell/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof ShellSettingsRouteImport
-      parentRoute: typeof ShellRoute
-    }
-    '/_shell/search': {
-      id: '/_shell/search'
-      path: '/search'
-      fullPath: '/search'
-      preLoaderRoute: typeof ShellSearchRouteImport
-      parentRoute: typeof ShellRoute
-    }
-    '/_shell/reading-list': {
-      id: '/_shell/reading-list'
-      path: '/reading-list'
-      fullPath: '/reading-list'
-      preLoaderRoute: typeof ShellReadingListRouteImport
-      parentRoute: typeof ShellRoute
-    }
-    '/_shell/profile': {
-      id: '/_shell/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof ShellProfileRouteImport
-      parentRoute: typeof ShellRoute
-    }
-    '/_shell/new-arrivals': {
-      id: '/_shell/new-arrivals'
-      path: '/new-arrivals'
-      fullPath: '/new-arrivals'
-      preLoaderRoute: typeof ShellNewArrivalsRouteImport
-      parentRoute: typeof ShellRoute
-    }
-    '/_shell/lists': {
-      id: '/_shell/lists'
-      path: '/lists'
-      fullPath: '/lists'
-      preLoaderRoute: typeof ShellListsRouteImport
+    '/_shell/favorites': {
+      id: '/_shell/favorites'
+      path: '/favorites'
+      fullPath: '/favorites'
+      preLoaderRoute: typeof ShellFavoritesRouteImport
       parentRoute: typeof ShellRoute
     }
     '/_shell/inventory': {
@@ -302,11 +268,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellInventoryRouteImport
       parentRoute: typeof ShellRoute
     }
-    '/_shell/favorites': {
-      id: '/_shell/favorites'
-      path: '/favorites'
-      fullPath: '/favorites'
-      preLoaderRoute: typeof ShellFavoritesRouteImport
+    '/_shell/lists': {
+      id: '/_shell/lists'
+      path: '/lists'
+      fullPath: '/lists'
+      preLoaderRoute: typeof ShellListsRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/new-arrivals': {
+      id: '/_shell/new-arrivals'
+      path: '/new-arrivals'
+      fullPath: '/new-arrivals'
+      preLoaderRoute: typeof ShellNewArrivalsRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/profile': {
+      id: '/_shell/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ShellProfileRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/search': {
+      id: '/_shell/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof ShellSearchRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/settings': {
+      id: '/_shell/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof ShellSettingsRouteImport
       parentRoute: typeof ShellRoute
     }
     '/_shell/comic/$id': {
@@ -314,6 +308,13 @@ declare module '@tanstack/react-router' {
       path: '/comic/$id'
       fullPath: '/comic/$id'
       preLoaderRoute: typeof ShellComicIdRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/lists_/$id': {
+      id: '/_shell/lists_/$id'
+      path: '/lists/$id'
+      fullPath: '/lists/$id'
+      preLoaderRoute: typeof ShellListsIdRouteImport
       parentRoute: typeof ShellRoute
     }
   }
@@ -325,12 +326,11 @@ interface ShellRouteChildren {
   ShellListsRoute: typeof ShellListsRoute
   ShellNewArrivalsRoute: typeof ShellNewArrivalsRoute
   ShellProfileRoute: typeof ShellProfileRoute
-  ShellReadingListRoute: typeof ShellReadingListRoute
   ShellSearchRoute: typeof ShellSearchRoute
   ShellSettingsRoute: typeof ShellSettingsRoute
-  ShellWishlistRoute: typeof ShellWishlistRoute
   ShellIndexRoute: typeof ShellIndexRoute
   ShellComicIdRoute: typeof ShellComicIdRoute
+  ShellListsIdRoute: typeof ShellListsIdRoute
 }
 
 const ShellRouteChildren: ShellRouteChildren = {
@@ -339,12 +339,11 @@ const ShellRouteChildren: ShellRouteChildren = {
   ShellListsRoute: ShellListsRoute,
   ShellNewArrivalsRoute: ShellNewArrivalsRoute,
   ShellProfileRoute: ShellProfileRoute,
-  ShellReadingListRoute: ShellReadingListRoute,
   ShellSearchRoute: ShellSearchRoute,
   ShellSettingsRoute: ShellSettingsRoute,
-  ShellWishlistRoute: ShellWishlistRoute,
   ShellIndexRoute: ShellIndexRoute,
   ShellComicIdRoute: ShellComicIdRoute,
+  ShellListsIdRoute: ShellListsIdRoute,
 }
 
 const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
@@ -353,8 +352,19 @@ const rootRouteChildren: RootRouteChildren = {
   ShellRoute: ShellRouteWithChildren,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

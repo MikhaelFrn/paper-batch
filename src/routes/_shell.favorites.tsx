@@ -10,14 +10,14 @@ import {
   useFavoriteCreators,
 } from "@/hooks/useFavorites";
 import { useUserCollection } from "@/hooks/useUserComics";
-import { userComicToComic } from "@/lib/mock-data";
+import { userComicToComic } from "@/lib/comic-adapters";
 
 export const Route = createFileRoute("/_shell/favorites")({
   head: () => ({
     meta: [
-      { title: "Favorites · Longbox" },
+      { title: "Favorites · Comic Vault" },
       { name: "description", content: "Your favorite series, publishers, writers, and artists." },
-      { property: "og:title", content: "My favorites — Longbox" },
+      { property: "og:title", content: "My favorites — Comic Vault" },
       { property: "og:description", content: "The creators and stories you love most." },
     ],
   }),

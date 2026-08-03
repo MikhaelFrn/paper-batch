@@ -1,14 +1,27 @@
-import { Outlet, createFileRoute } from "@tanstack/react-router";
+import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Topbar } from "@/components/topbar";
 import { Toaster } from "@/components/ui/sonner";
+import { fetchServerUser } from "@/services/auth-server";
+import { useFixStuckBodyPointerEvents } from "@/hooks/useFixStuckBodyPointerEvents";
 
 export const Route = createFileRoute("/_shell")({
+  beforeLoad: async ({ location }) => {
+    const user = await fetchServerUser();
+    if (!user) {
+      throw redirect({
+        to: "/login",
+        search: { redirect: location.href },
+      });
+    }
+  },
   component: ShellLayout,
 });
 
 function ShellLayout() {
+  useFixStuckBodyPointerEvents();
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background">

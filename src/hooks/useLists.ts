@@ -5,6 +5,7 @@ import {
   createList,
   deleteList,
   getList,
+  getOrCreateDefaultList,
   listMyLists,
   removeIssueFromList,
   updateList,
@@ -56,6 +57,29 @@ export function useDeleteList() {
     onSuccess: (_data, id) => {
       qc.invalidateQueries({ queryKey: queryKeys.lists.mine() });
       qc.removeQueries({ queryKey: queryKeys.lists.detail(id) });
+    },
+  });
+}
+
+/** Adds an issue to the user's default wishlist/reading list, creating that
+ * list first if this is the first time they've used it. */
+export function useAddIssueToDefaultList() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      type,
+      issueId,
+    }: {
+      type: "wishlist" | "reading";
+      issueId: string;
+    }) => {
+      const list = await getOrCreateDefaultList(type);
+      await addIssueToList(list.id, issueId);
+      return list;
+    },
+    onSuccess: (list) => {
+      qc.invalidateQueries({ queryKey: queryKeys.lists.mine() });
+      qc.invalidateQueries({ queryKey: queryKeys.lists.detail(list.id) });
     },
   });
 }

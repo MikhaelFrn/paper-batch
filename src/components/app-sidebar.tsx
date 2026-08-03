@@ -3,8 +3,6 @@ import {
   LayoutDashboard,
   Library,
   Sparkles,
-  Bookmark,
-  BookOpen,
   ListChecks,
   Heart,
   Search,
@@ -33,9 +31,7 @@ const main = [
 ];
 
 const collections = [
-  { title: "Wishlist", url: "/wishlist", icon: Bookmark },
-  { title: "Reading List", url: "/reading-list", icon: BookOpen },
-  { title: "Custom Lists", url: "/lists", icon: ListChecks },
+  { title: "Lists", url: "/lists", icon: ListChecks },
   { title: "Favorites", url: "/favorites", icon: Heart },
 ];
 
@@ -56,8 +52,7 @@ export function AppSidebar() {
             <Zap className="h-5 w-5 text-primary-foreground" />
           </div>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-            <div className="font-display text-lg leading-none tracking-wide text-foreground">LONGBOX</div>
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Collection OS</div>
+            <div className="font-display text-lg leading-none tracking-wide text-foreground">Comic Vault</div>
           </div>
         </Link>
       </SidebarHeader>
@@ -119,10 +114,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="rounded-lg border border-sidebar-border bg-sidebar-accent/40 p-3 text-xs text-sidebar-foreground group-data-[collapsible=icon]:hidden">
-          <div className="mb-1 font-semibold">Sync with ComicVine</div>
-          <div className="text-muted-foreground">Connect your favorite comic DB to enrich metadata.</div>
-        </div>
+
       </SidebarFooter>
     </Sidebar>
   );

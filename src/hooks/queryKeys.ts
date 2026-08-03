@@ -73,4 +73,10 @@ export const queryKeys = {
     query: (query: string, limit?: number) =>
       [...queryKeys.search.all, query, limit ?? null] as const,
   },
+  comicvine: {
+    all: ["comicvine"] as const,
+    search: (query: string) =>
+      [...queryKeys.comicvine.all, "search", query] as const,
+    newArrivals: () => [...queryKeys.comicvine.all, "newArrivals"] as const,
+  },
 } as const;

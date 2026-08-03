@@ -2,8 +2,9 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Run, RunWithRelations } from "@/lib/types";
 import { unwrapMaybe } from "./_utils";
 
+// `runs` has no direct FK to `series` — see the note in listRunsBySeries.
 const RUN_WITH_RELATIONS =
-  "*, series:series(*, publisher:publishers(*)), run_creators(role, creator:creators(*))" as const;
+  "*, run_creators(role, creator:creators(*))" as const;
 
 export async function listRunsBySeries(_seriesId: string): Promise<Run[]> {
   // The `runs` table has no direct series_id column in the current schema;

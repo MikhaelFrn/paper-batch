@@ -1,4 +1,5 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
@@ -14,16 +15,11 @@ if (!supabaseUrl || !supabasePublishableKey) {
   );
 }
 
-export const supabase: SupabaseClient<Database> = createClient<Database>(
+// Cookie-backed (not localStorage) so the SSR server client can read the
+// same session — see integrations/supabase/server-client.ts.
+export const supabase: SupabaseClient<Database> = createBrowserClient<Database>(
   supabaseUrl,
   supabasePublishableKey,
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
-  },
 );
 
 export type { Database } from "./database.types";

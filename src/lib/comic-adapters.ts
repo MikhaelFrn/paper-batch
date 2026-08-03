@@ -1,13 +1,10 @@
 // Presentation adapter layer.
 //
-// The UI components (ComicCard, ComicCover, route pages) were originally
-// designed against a flat "Comic" shape. This module preserves that shape as
-// a UI contract and provides adapters that map live typed data
-// (`IssueWithRelations`, `UserComic`, `Publisher`) into it, so components
-// don't need to be rewritten.
-//
-// No mock data lives here anymore — all data is loaded through React Query
-// hooks in `@/hooks`, which call the typed service layer.
+// The UI components (ComicCard, ComicCover, route pages) are designed
+// against a flat "Comic" shape. This module is the UI contract and provides
+// adapters that map live typed data (`IssueWithRelations`, `UserComic`,
+// `Publisher`, ComicVine search results) into it, so components don't need
+// per-source variants.
 
 import type {
   Creator,
@@ -16,6 +13,7 @@ import type {
   Publisher as PublisherRow,
   UserComic,
 } from "./types";
+import type { CvSearchIssue } from "@/integrations/comicvine/types";
 
 // ---------- UI-facing types (component API — do not change shape) ----------
 
@@ -45,6 +43,10 @@ export interface Comic {
   wishlist: boolean;
   favorite: boolean;
   rating?: number;
+  /** Set only for ComicVine search results not yet saved locally — `id` is
+   * a synthetic placeholder, not a real row id. Its presence is what tells
+   * ComicCard to import-then-navigate instead of linking directly. */
+  comicVineDetailUrl?: string;
 }
 
 export interface CustomList {
@@ -166,4 +168,39 @@ export function userComicToComic(
 
 export function publisherToComic(p: PublisherRow): Publisher {
   return p.name;
+}
+
+/** A ComicVine search result not yet imported into the catalog. Publisher
+ * isn't available on issue search results (only on volume results) without
+ * an extra detail call per row, so it's "Unknown" unless the caller already
+ * resolved it (e.g. New Arrivals, which needs it anyway for allowlisting). */
+export function cvIssueToComic(cv: CvSearchIssue, publisherName?: string): Comic {
+  const series = cv.volume?.name ?? "Unknown Series";
+  // Foreign-market reprint editions frequently have neither date set on
+  // ComicVine — leave it genuinely empty rather than fabricating a year
+  // (e.g. epoch 1970), which made unrelated undated issues look identical.
+  const releaseDate = cv.store_date ?? cv.cover_date ?? "";
+
+  return {
+    id: `cv-${cv.id}`,
+    title: cv.name?.trim() || `${series} #${cv.issue_number ?? "?"}`,
+    issue: parseIssueNumber(cv.issue_number),
+    volume: 1,
+    series,
+    publisher: publisherName ?? "Unknown",
+    universe: "Unknown",
+    writers: ["—"],
+    artists: [],
+    releaseDate,
+    addedDate: releaseDate,
+    synopsis: "",
+    characters: [],
+    teams: [],
+    storyArcs: [],
+    owned: false,
+    read: false,
+    wishlist: false,
+    favorite: false,
+    comicVineDetailUrl: cv.api_detail_url,
+  };
 }

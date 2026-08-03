@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Profile, ProfileUpdate } from "@/lib/types";
+import type { TablesInsert } from "@/integrations/supabase/database.types";
 import { requireUserId, unwrap, unwrapMaybe } from "./_utils";
 
 export async function getProfile(userId: string): Promise<Profile | null> {
@@ -38,5 +39,30 @@ export async function upsertMyProfile(patch: ProfileUpdate): Promise<Profile> {
       .select("*")
       .single(),
     "Failed to upsert profile",
+  );
+}
+
+export async function createProfile(profile: TablesInsert<"profiles">): Promise<Profile> {
+    const {
+      id,
+      username,
+      display_name,
+      avatar_url,
+      bio,
+    } = profile;
+
+  return unwrap(
+    await supabase
+      .from("profiles")
+      .insert({
+        id,
+        username,
+        display_name,
+        avatar_url,
+        bio,
+      })
+      .select("*")
+      .single(),
+    "Failed to create profile",
   );
 }

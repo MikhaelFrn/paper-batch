@@ -42,7 +42,7 @@ export interface CreateListInput {
 
 export async function createList(input: CreateListInput): Promise<ListRow> {
   const uid = await requireUserId();
-  return unwrap(
+  const list = await unwrap<ListRow>(
     await supabase
       .from("lists")
       .insert({
@@ -56,6 +56,20 @@ export async function createList(input: CreateListInput): Promise<ListRow> {
       .single(),
     "Failed to create list",
   );
+
+  // Membership-gated policies (list_items, list_members) check for a
+  // list_members row, not lists.owner_id directly — register the owner as
+  // one now so future membership-based features work without every policy
+  // needing its own owner_id fallback. Non-fatal: owner_id-based RLS
+  // fallbacks already grant the owner full access regardless.
+  const { error: memberError } = await supabase
+    .from("list_members")
+    .insert({ list_id: list.id, user_id: uid, role: "owner" });
+  if (memberError) {
+    console.error("Failed to register list owner as a member", memberError);
+  }
+
+  return list;
 }
 
 export async function updateList(
@@ -73,6 +87,32 @@ export async function updateList(
 export async function deleteList(id: string): Promise<void> {
   const { error } = await supabase.from("lists").delete().eq("id", id);
   if (error) throw new Error(error.message);
+}
+
+const DEFAULT_LIST_NAMES: Record<"wishlist" | "reading", string> = {
+  wishlist: "Wishlist",
+  reading: "Reading List",
+};
+
+/** Every user has at most one "wishlist" and one "reading" list — created
+ * lazily on first use so actions like "add to wishlist" always have
+ * somewhere to go without the user pre-creating it. */
+export async function getOrCreateDefaultList(
+  type: "wishlist" | "reading",
+): Promise<ListRow> {
+  const uid = await requireUserId();
+  const existing = await unwrapMaybe(
+    await supabase
+      .from("lists")
+      .select("*")
+      .eq("owner_id", uid)
+      .eq("type", type)
+      .maybeSingle(),
+    "Failed to load list",
+  );
+  if (existing) return existing;
+
+  return createList({ name: DEFAULT_LIST_NAMES[type], type });
 }
 
 export async function addIssueToList(

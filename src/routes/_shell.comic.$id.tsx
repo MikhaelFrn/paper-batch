@@ -6,15 +6,22 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useIssue, useRecentIssues } from "@/hooks/useIssues";
-import { useMyUserComicByIssue } from "@/hooks/useUserComics";
-import { issueToComic } from "@/lib/mock-data";
+import { useMyUserComicByIssue, useUpsertMyUserComic } from "@/hooks/useUserComics";
+import { useAddIssueToDefaultList } from "@/hooks/useLists";
+import {
+  useFavoritePublishers,
+  useFavoriteSeries,
+  useToggleFavoritePublisher,
+  useToggleFavoriteSeries,
+} from "@/hooks/useFavorites";
+import { issueToComic } from "@/lib/comic-adapters";
 
 export const Route = createFileRoute("/_shell/comic/$id")({
   head: () => ({
     meta: [
-      { title: "Comic · Longbox" },
+      { title: "Comic · Comic Vault" },
       { name: "description", content: "Comic detail" },
-      { property: "og:title", content: "Comic — Longbox" },
+      { property: "og:title", content: "Comic — Comic Vault" },
       { property: "og:description", content: "Full metadata and credits for this issue." },
     ],
   }),
@@ -35,6 +42,12 @@ function ComicDetail() {
   const issueQ = useIssue(id);
   const userComicQ = useMyUserComicByIssue(id);
   const recent = useRecentIssues(24);
+  const favSeries = useFavoriteSeries();
+  const favPublishers = useFavoritePublishers();
+  const addToWishlist = useAddIssueToDefaultList();
+  const upsertUserComic = useUpsertMyUserComic();
+  const toggleFavSeries = useToggleFavoriteSeries();
+  const toggleFavPublisher = useToggleFavoritePublisher();
 
   if (issueQ.isLoading) {
     return <div className="py-20 text-center text-sm text-muted-foreground">Loading…</div>;
@@ -64,6 +77,63 @@ function ComicDetail() {
     .slice(0, 6)
     .map((i) => issueToComic(i));
 
+  const seriesId = issueQ.data.volume?.series?.id;
+  const publisherId = issueQ.data.volume?.series?.publisher?.id;
+  const isFavSeries = !!seriesId && (favSeries.data ?? []).some((s) => s.id === seriesId);
+  const isFavPublisher = !!publisherId && (favPublishers.data ?? []).some((p) => p.id === publisherId);
+
+  const handleWishlist = () => {
+    addToWishlist.mutate(
+      { type: "wishlist", issueId: comic.id },
+      {
+        onSuccess: () => toast.success("Added to wishlist"),
+        onError: () => toast.error("Couldn't add to wishlist"),
+      },
+    );
+  };
+
+  const handleToggleOwned = () => {
+    upsertUserComic.mutate(
+      { issueId: comic.id, owned: !comic.owned },
+      {
+        onSuccess: () => toast.success(comic.owned ? "Removed from owned" : "Marked as owned"),
+        onError: () => toast.error("Couldn't update"),
+      },
+    );
+  };
+
+  const handleToggleRead = () => {
+    upsertUserComic.mutate(
+      { issueId: comic.id, read: !comic.read },
+      {
+        onSuccess: () => toast.success(comic.read ? "Marked as unread" : "Marked as read"),
+        onError: () => toast.error("Couldn't update"),
+      },
+    );
+  };
+
+  const handleToggleFavSeries = () => {
+    if (!seriesId) return;
+    toggleFavSeries.mutate(
+      { seriesId, isFavorite: isFavSeries },
+      {
+        onSuccess: () => toast.success(isFavSeries ? `${comic.series} unfavorited` : `${comic.series} favorited`),
+        onError: () => toast.error("Couldn't update favorites"),
+      },
+    );
+  };
+
+  const handleToggleFavPublisher = () => {
+    if (!publisherId) return;
+    toggleFavPublisher.mutate(
+      { publisherId, isFavorite: isFavPublisher },
+      {
+        onSuccess: () => toast.success(isFavPublisher ? `${comic.publisher} unfavorited` : `${comic.publisher} favorited`),
+        onError: () => toast.error("Couldn't update favorites"),
+      },
+    );
+  };
+
   return (
     <div className="-mx-4 sm:-mx-6 lg:-mx-8">
       {/* Hero */}
@@ -91,11 +161,21 @@ function ComicDetail() {
             <p className="mt-4 max-w-2xl text-sm leading-relaxed text-white/85">{comic.synopsis}</p>
 
             <div className="mt-6 flex flex-wrap gap-2">
-              <Button onClick={() => toast.success("Added to wishlist")}><Bookmark className="h-4 w-4" />Wishlist</Button>
-              <Button variant="secondary" onClick={() => toast.success("Marked as owned")}>Mark as owned</Button>
-              <Button variant="secondary" onClick={() => toast.success("Marked as read")}><BookOpen className="h-4 w-4" />Mark read</Button>
-              <Button variant="outline" onClick={() => toast.success(`${comic.series} favorited`)}><Heart className="h-4 w-4" />Favorite series</Button>
-              <Button variant="outline" onClick={() => toast.success(`${comic.publisher} favorited`)}><Star className="h-4 w-4" />Favorite publisher</Button>
+              <Button onClick={handleWishlist} disabled={addToWishlist.isPending}>
+                <Bookmark className="h-4 w-4" />{addToWishlist.isPending ? "Adding…" : "Wishlist"}
+              </Button>
+              <Button variant={comic.owned ? "default" : "secondary"} onClick={handleToggleOwned} disabled={upsertUserComic.isPending}>
+                {comic.owned ? "Owned ✓" : "Mark as owned"}
+              </Button>
+              <Button variant={comic.read ? "default" : "secondary"} onClick={handleToggleRead} disabled={upsertUserComic.isPending}>
+                <BookOpen className="h-4 w-4" />{comic.read ? "Read ✓" : "Mark read"}
+              </Button>
+              <Button variant={isFavSeries ? "default" : "outline"} onClick={handleToggleFavSeries} disabled={toggleFavSeries.isPending}>
+                <Heart className="h-4 w-4" />{isFavSeries ? "Series favorited" : "Favorite series"}
+              </Button>
+              <Button variant={isFavPublisher ? "default" : "outline"} onClick={handleToggleFavPublisher} disabled={toggleFavPublisher.isPending}>
+                <Star className="h-4 w-4" />{isFavPublisher ? "Publisher favorited" : "Favorite publisher"}
+              </Button>
               <Button variant="ghost" size="icon"><Share2 className="h-4 w-4" /></Button>
             </div>
           </div>
