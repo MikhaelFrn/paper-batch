@@ -3,6 +3,24 @@ import type { Profile, ProfileUpdate } from "@/lib/types";
 import type { TablesInsert } from "@/integrations/supabase/database.types";
 import { requireUserId, unwrap, unwrapMaybe } from "./_utils";
 
+/** Username lookup for adding list collaborators — profiles are the only
+ * public-facing identity (email isn't stored there / isn't public). */
+export async function searchProfilesByUsername(
+  query: string,
+  limit = 10,
+): Promise<Profile[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  return unwrap(
+    await supabase
+      .from("profiles")
+      .select("*")
+      .ilike("username", `%${trimmed}%`)
+      .limit(limit),
+    "Failed to search profiles",
+  );
+}
+
 export async function getProfile(userId: string): Promise<Profile | null> {
   return unwrapMaybe(
     await supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),

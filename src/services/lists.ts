@@ -1,6 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import type {
   ListInsert,
+  ListMemberRole,
+  ListMemberWithProfile,
   ListRow,
   ListUpdate,
   ListWithItems,
@@ -134,5 +136,56 @@ export async function removeIssueFromList(
     .delete()
     .eq("list_id", listId)
     .eq("issue_id", issueId);
+  if (error) throw new Error(error.message);
+}
+
+// ---------- Collaborators ----------
+// list_members.user_id references auth.users, not public.profiles, so
+// there's no FK PostgREST can embed a join through — fetch members, then
+// fetch their profiles by id, and merge.
+export async function listListMembers(
+  listId: string,
+): Promise<ListMemberWithProfile[]> {
+  const members = unwrap(
+    await supabase
+      .from("list_members")
+      .select("*")
+      .eq("list_id", listId)
+      .order("joined_at", { ascending: true }),
+    "Failed to load collaborators",
+  );
+  if (members.length === 0) return [];
+
+  const profiles = unwrap(
+    await supabase
+      .from("profiles")
+      .select("*")
+      .in("id", members.map((m) => m.user_id)),
+    "Failed to load collaborator profiles",
+  );
+  const profileById = new Map(profiles.map((p) => [p.id, p]));
+  return members.map((m) => ({ ...m, profile: profileById.get(m.user_id) ?? null }));
+}
+
+export async function addListMember(
+  listId: string,
+  userId: string,
+  role: ListMemberRole,
+): Promise<void> {
+  const { error } = await supabase
+    .from("list_members")
+    .insert({ list_id: listId, user_id: userId, role });
+  if (error) throw new Error(error.message);
+}
+
+export async function removeListMember(
+  listId: string,
+  userId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("list_members")
+    .delete()
+    .eq("list_id", listId)
+    .eq("user_id", userId);
   if (error) throw new Error(error.message);
 }

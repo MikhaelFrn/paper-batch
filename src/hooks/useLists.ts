@@ -1,13 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ListRow, ListUpdate, ListWithItems } from "@/lib/types";
+import type {
+  ListMemberRole,
+  ListMemberWithProfile,
+  ListRow,
+  ListUpdate,
+  ListWithItems,
+} from "@/lib/types";
 import {
   addIssueToList,
+  addListMember,
   createList,
   deleteList,
   getList,
   getOrCreateDefaultList,
+  listListMembers,
   listMyLists,
   removeIssueFromList,
+  removeListMember,
   updateList,
   type CreateListInput,
 } from "@/services/lists";
@@ -102,6 +111,43 @@ export function useRemoveIssueFromList() {
       removeIssueFromList(listId, issueId),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.lists.detail(vars.listId) });
+    },
+  });
+}
+
+export function useListMembers(listId: string | undefined) {
+  return useQuery<ListMemberWithProfile[]>({
+    queryKey: queryKeys.lists.members(listId ?? "unknown"),
+    queryFn: () => listListMembers(listId as string),
+    enabled: !!listId,
+  });
+}
+
+export function useAddListMember() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      listId,
+      userId,
+      role,
+    }: {
+      listId: string;
+      userId: string;
+      role: ListMemberRole;
+    }) => addListMember(listId, userId, role),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.lists.members(vars.listId) });
+    },
+  });
+}
+
+export function useRemoveListMember() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ listId, userId }: { listId: string; userId: string }) =>
+      removeListMember(listId, userId),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.lists.members(vars.listId) });
     },
   });
 }

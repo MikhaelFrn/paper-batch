@@ -122,6 +122,14 @@ export interface ListWithItems extends ListRow {
   list_items: Array<ListItem & { issue: IssueWithRelations | null }>;
 }
 
+/** A list_members row joined with the member's profile (no FK PostgREST
+ * can embed — list_members.user_id references auth.users, not
+ * public.profiles — so this is assembled from two queries in the service
+ * layer, not a single embedded select). */
+export interface ListMemberWithProfile extends ListMember {
+  profile: Profile | null;
+}
+
 /** Grouped, typed search payload returned by the search service. */
 export interface SearchResults {
   issues: IssueWithRelations[];

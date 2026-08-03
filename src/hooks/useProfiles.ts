@@ -3,10 +3,20 @@ import type { Profile, ProfileUpdate } from "@/lib/types";
 import {
   getMyProfile,
   getProfile,
+  searchProfilesByUsername,
   updateMyProfile,
   upsertMyProfile,
 } from "@/services/profiles";
 import { queryKeys } from "./queryKeys";
+
+export function useSearchProfiles(query: string) {
+  const trimmed = query.trim();
+  return useQuery<Profile[]>({
+    queryKey: queryKeys.profiles.search(trimmed),
+    queryFn: () => searchProfilesByUsername(trimmed),
+    enabled: trimmed.length > 0,
+  });
+}
 
 export function useProfile(userId: string | undefined) {
   return useQuery<Profile | null>({

@@ -11,6 +11,7 @@ export const queryKeys = {
     all: ["profiles"] as const,
     detail: (userId: string) => [...queryKeys.profiles.all, userId] as const,
     me: () => [...queryKeys.profiles.all, "me"] as const,
+    search: (query: string) => [...queryKeys.profiles.all, "search", query] as const,
   },
   publishers: {
     all: ["publishers"] as const,
@@ -67,6 +68,7 @@ export const queryKeys = {
     all: ["lists"] as const,
     mine: () => [...queryKeys.lists.all, "mine"] as const,
     detail: (id: string) => [...queryKeys.lists.all, id] as const,
+    members: (id: string) => [...queryKeys.lists.all, id, "members"] as const,
   },
   search: {
     all: ["search"] as const,
