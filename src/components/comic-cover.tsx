@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { getPublisherAccent, type Comic } from "@/lib/comic-adapters";
 
@@ -14,9 +15,35 @@ const sizes = {
   xl: "aspect-[2/3] text-base",
 };
 
-// Stylised faux comic cover — self-contained, no external image assets.
+// Real cover when we have one (ComicVine's image, fetched on import — see
+// comic-adapters.ts). Falls back to a stylised faux cover, self-contained
+// with no external image, for the issues ComicVine has no art for or if the
+// image URL fails to load.
 export function ComicCover({ comic, className, size = "md" }: Props) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = !!comic.coverUrl && !imageFailed;
   const gradient = getPublisherAccent(comic.publisher);
+
+  if (showImage) {
+    return (
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-md comic-cover-shadow ring-1 ring-white/5",
+          sizes[size],
+          className,
+        )}
+      >
+        <img
+          src={comic.coverUrl}
+          alt={`${comic.series} #${comic.issue} cover`}
+          className="h-full w-full object-cover"
+          loading="lazy"
+          onError={() => setImageFailed(true)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(

@@ -43,6 +43,12 @@ export interface Comic {
   wishlist: boolean;
   favorite: boolean;
   rating?: number;
+  /** From issues.cover_url (local) or ComicVine's search image (unimported)
+   * — both already populated well before this field existed, see
+   * services/comicvine.ts's upsertIssue. Absent (not just a broken URL)
+   * for the rare issue ComicVine has no image for; ComicCover falls back
+   * to its stylised placeholder either way. */
+  coverUrl?: string;
   /** Set only for ComicVine search results not yet saved locally — `id` is
    * a synthetic placeholder, not a real row id. Its presence is what tells
    * ComicCard to import-then-navigate instead of linking directly. */
@@ -152,6 +158,7 @@ export function issueToComic(
     wishlist: state.wishlist ?? false,
     favorite: state.favorite ?? false,
     rating: state.rating ?? undefined,
+    coverUrl: issue.cover_url ?? issue.volume?.cover_url ?? undefined,
   };
 }
 
@@ -201,6 +208,7 @@ export function cvIssueToComic(cv: CvSearchIssue, publisherName?: string): Comic
     read: false,
     wishlist: false,
     favorite: false,
+    coverUrl: cv.image?.medium_url || undefined,
     comicVineDetailUrl: cv.api_detail_url,
   };
 }
