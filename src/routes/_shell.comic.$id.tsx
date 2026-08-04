@@ -1,14 +1,21 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Bookmark, BookOpen, Heart, Star, Waypoints } from "lucide-react";
+import { Bookmark, BookOpen, Heart, ListPlus, Plus, Star, Waypoints } from "lucide-react";
 import { ComicCard, PublisherBadge, RatingStars } from "@/components/comic-card";
 import { ComicCover } from "@/components/comic-cover";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useIssue, useRecentIssues } from "@/hooks/useIssues";
 import { useMyUserComicByIssue, useUpsertMyUserComic } from "@/hooks/useUserComics";
-import { useAddIssueToDefaultList } from "@/hooks/useLists";
+import { useAddIssueToDefaultList, useAddIssueToList, useMyLists } from "@/hooks/useLists";
 import { useRunsForIssue } from "@/hooks/useRuns";
 import {
   useFavoritePublishers,
@@ -36,6 +43,51 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
       <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{label}</div>
       <div className="mt-0.5 text-sm">{value}</div>
     </div>
+  );
+}
+
+/** Every other list besides the default wishlist — that one already has its
+ * own quick button. Viewer-only collaborators are excluded since they can
+ * see but not add to a shared list (owners/editors only, enforced by RLS
+ * regardless, but no point offering an action that'll just fail). */
+function AddToListMenu({ issueId }: { issueId: string }) {
+  const lists = useMyLists();
+  const addToList = useAddIssueToList();
+  const addableLists = (lists.data ?? []).filter((l) => l.myRole !== "viewer");
+
+  const handleAdd = (listId: string, listName: string) => {
+    addToList.mutate(
+      { listId, issueId },
+      {
+        onSuccess: () => toast.success(`Added to ${listName}`),
+        onError: () => toast.error(`Couldn't add to ${listName}`),
+      },
+    );
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" disabled={addToList.isPending}>
+          <ListPlus className="h-4 w-4" />Add to list
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
+        {addableLists.length === 0 ? (
+          <DropdownMenuItem disabled>No lists yet</DropdownMenuItem>
+        ) : (
+          addableLists.map((l) => (
+            <DropdownMenuItem key={l.id} onClick={() => handleAdd(l.id, l.name)}>
+              {l.name}
+            </DropdownMenuItem>
+          ))
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link to="/lists"><Plus className="mr-2 h-4 w-4" />New list</Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -171,6 +223,7 @@ function ComicDetail() {
               <Button onClick={handleWishlist} disabled={addToWishlist.isPending}>
                 <Bookmark className="h-4 w-4" />{addToWishlist.isPending ? "Adding…" : "Wishlist"}
               </Button>
+              <AddToListMenu issueId={comic.id} />
               <Button variant={comic.owned ? "default" : "secondary"} onClick={handleToggleOwned} disabled={upsertUserComic.isPending}>
                 {comic.owned ? "Owned ✓" : "Mark as owned"}
               </Button>
