@@ -541,6 +541,27 @@ export interface Database {
           },
         ];
       };
+      barcode_lookups: {
+        Row: {
+          upc: string;
+          issue_id: string;
+          created_at: string;
+        };
+        Insert: {
+          upc: string;
+          issue_id: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["barcode_lookups"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "barcode_lookups_issue_id_fkey";
+            columns: ["issue_id"];
+            referencedRelation: "issues";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { Issue, IssueWithRelations } from "@/lib/types";
+import type { IssueWithRelations } from "@/lib/types";
 import { unwrap, unwrapMaybe } from "./_utils";
 
 const ISSUE_WITH_RELATIONS =
@@ -16,15 +16,15 @@ export async function listRecentIssues(limit = 24): Promise<IssueWithRelations[]
   ) as IssueWithRelations[];
 }
 
-export async function listIssuesByVolume(volumeId: string): Promise<Issue[]> {
+export async function listIssuesByVolume(volumeId: string): Promise<IssueWithRelations[]> {
   return unwrap(
     await supabase
       .from("issues")
-      .select("*")
+      .select(ISSUE_WITH_RELATIONS)
       .eq("volume_id", volumeId)
       .order("sort_number", { ascending: true, nullsFirst: false }),
     "Failed to load issues",
-  );
+  ) as IssueWithRelations[];
 }
 
 export async function getIssue(id: string): Promise<IssueWithRelations | null> {

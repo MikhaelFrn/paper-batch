@@ -21,7 +21,13 @@ export function getSupabaseServerClient(): SupabaseClient<Database> {
       },
       setAll(cookiesToSet) {
         for (const { name, value, options } of cookiesToSet) {
-          setCookie(name, value, options);
+          // @supabase/ssr hardcodes maxAge to 400 days on every write,
+          // ignoring any cookieOptions passed to createServerClient — so
+          // the only way to make the auth cookie session-only (cleared on
+          // browser quit, not just tab close) is to strip it here, after
+          // the library has already built its options object.
+          const { maxAge: _maxAge, expires: _expires, ...sessionOptions } = options ?? {};
+          setCookie(name, value, sessionOptions);
         }
       },
     },

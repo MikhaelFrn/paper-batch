@@ -2,9 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   ListMemberRole,
   ListMemberWithProfile,
-  ListRow,
   ListUpdate,
   ListWithItems,
+  ListWithRole,
 } from "@/lib/types";
 import {
   addIssueToList,
@@ -23,7 +23,7 @@ import {
 import { queryKeys } from "./queryKeys";
 
 export function useMyLists() {
-  return useQuery<ListRow[]>({
+  return useQuery<ListWithRole[]>({
     queryKey: queryKeys.lists.mine(),
     queryFn: listMyLists,
   });

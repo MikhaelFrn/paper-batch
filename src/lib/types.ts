@@ -109,6 +109,14 @@ export interface RunWithRelations extends Run {
   >;
 }
 
+/** Run enriched with items + creators, no relationships — what the volume
+ * page needs. Relationship classification (continuation/recommended_before)
+ * is a later phase; see docs/comicvine-and-runs.md. */
+export interface RunWithItems extends Run {
+  run_items: RunItemWithRelations[];
+  run_creators: Array<Pick<RunCreator, "role"> & { creator: Creator | null }>;
+}
+
 export interface RunTimelineEntry {
   position: number;
 
@@ -128,6 +136,12 @@ export interface ListWithItems extends ListRow {
  * layer, not a single embedded select). */
 export interface ListMemberWithProfile extends ListMember {
   profile: Profile | null;
+}
+
+/** A list on the current user's "My Lists" page — either owned or shared
+ * with them as a collaborator, annotated with their role on it. */
+export interface ListWithRole extends ListRow {
+  myRole: ListMemberRole;
 }
 
 /** Grouped, typed search payload returned by the search service. */

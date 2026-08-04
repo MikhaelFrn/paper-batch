@@ -20,10 +20,12 @@ import { Route as ShellInventoryRouteImport } from './routes/_shell.inventory'
 import { Route as ShellListsRouteImport } from './routes/_shell.lists'
 import { Route as ShellNewArrivalsRouteImport } from './routes/_shell.new-arrivals'
 import { Route as ShellProfileRouteImport } from './routes/_shell.profile'
+import { Route as ShellScanRouteImport } from './routes/_shell.scan'
 import { Route as ShellSearchRouteImport } from './routes/_shell.search'
 import { Route as ShellSettingsRouteImport } from './routes/_shell.settings'
 import { Route as ShellComicIdRouteImport } from './routes/_shell.comic.$id'
 import { Route as ShellListsIdRouteImport } from './routes/_shell.lists_.$id'
+import { Route as ShellVolumesIdRouteImport } from './routes/_shell.volumes.$id'
 
 const ShellRoute = ShellRouteImport.update({
   id: '/_shell',
@@ -79,6 +81,11 @@ const ShellProfileRoute = ShellProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => ShellRoute,
 } as any)
+const ShellScanRoute = ShellScanRouteImport.update({
+  id: '/scan',
+  path: '/scan',
+  getParentRoute: () => ShellRoute,
+} as any)
 const ShellSearchRoute = ShellSearchRouteImport.update({
   id: '/search',
   path: '/search',
@@ -99,6 +106,11 @@ const ShellListsIdRoute = ShellListsIdRouteImport.update({
   path: '/lists/$id',
   getParentRoute: () => ShellRoute,
 } as any)
+const ShellVolumesIdRoute = ShellVolumesIdRouteImport.update({
+  id: '/volumes/$id',
+  path: '/volumes/$id',
+  getParentRoute: () => ShellRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof ShellIndexRoute
@@ -111,10 +123,12 @@ export interface FileRoutesByFullPath {
   '/lists': typeof ShellListsRoute
   '/new-arrivals': typeof ShellNewArrivalsRoute
   '/profile': typeof ShellProfileRoute
+  '/scan': typeof ShellScanRoute
   '/search': typeof ShellSearchRoute
   '/settings': typeof ShellSettingsRoute
   '/comic/$id': typeof ShellComicIdRoute
   '/lists/$id': typeof ShellListsIdRoute
+  '/volumes/$id': typeof ShellVolumesIdRoute
 }
 export interface FileRoutesByTo {
   '/forgot-password': typeof ForgotPasswordRoute
@@ -126,11 +140,13 @@ export interface FileRoutesByTo {
   '/lists': typeof ShellListsRoute
   '/new-arrivals': typeof ShellNewArrivalsRoute
   '/profile': typeof ShellProfileRoute
+  '/scan': typeof ShellScanRoute
   '/search': typeof ShellSearchRoute
   '/settings': typeof ShellSettingsRoute
   '/': typeof ShellIndexRoute
   '/comic/$id': typeof ShellComicIdRoute
   '/lists/$id': typeof ShellListsIdRoute
+  '/volumes/$id': typeof ShellVolumesIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -144,11 +160,13 @@ export interface FileRoutesById {
   '/_shell/lists': typeof ShellListsRoute
   '/_shell/new-arrivals': typeof ShellNewArrivalsRoute
   '/_shell/profile': typeof ShellProfileRoute
+  '/_shell/scan': typeof ShellScanRoute
   '/_shell/search': typeof ShellSearchRoute
   '/_shell/settings': typeof ShellSettingsRoute
   '/_shell/': typeof ShellIndexRoute
   '/_shell/comic/$id': typeof ShellComicIdRoute
   '/_shell/lists_/$id': typeof ShellListsIdRoute
+  '/_shell/volumes/$id': typeof ShellVolumesIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -163,10 +181,12 @@ export interface FileRouteTypes {
     | '/lists'
     | '/new-arrivals'
     | '/profile'
+    | '/scan'
     | '/search'
     | '/settings'
     | '/comic/$id'
     | '/lists/$id'
+    | '/volumes/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/forgot-password'
@@ -178,11 +198,13 @@ export interface FileRouteTypes {
     | '/lists'
     | '/new-arrivals'
     | '/profile'
+    | '/scan'
     | '/search'
     | '/settings'
     | '/'
     | '/comic/$id'
     | '/lists/$id'
+    | '/volumes/$id'
   id:
     | '__root__'
     | '/_shell'
@@ -195,11 +217,13 @@ export interface FileRouteTypes {
     | '/_shell/lists'
     | '/_shell/new-arrivals'
     | '/_shell/profile'
+    | '/_shell/scan'
     | '/_shell/search'
     | '/_shell/settings'
     | '/_shell/'
     | '/_shell/comic/$id'
     | '/_shell/lists_/$id'
+    | '/_shell/volumes/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -289,6 +313,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellProfileRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/_shell/scan': {
+      id: '/_shell/scan'
+      path: '/scan'
+      fullPath: '/scan'
+      preLoaderRoute: typeof ShellScanRouteImport
+      parentRoute: typeof ShellRoute
+    }
     '/_shell/search': {
       id: '/_shell/search'
       path: '/search'
@@ -317,6 +348,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellListsIdRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/_shell/volumes/$id': {
+      id: '/_shell/volumes/$id'
+      path: '/volumes/$id'
+      fullPath: '/volumes/$id'
+      preLoaderRoute: typeof ShellVolumesIdRouteImport
+      parentRoute: typeof ShellRoute
+    }
   }
 }
 
@@ -326,11 +364,13 @@ interface ShellRouteChildren {
   ShellListsRoute: typeof ShellListsRoute
   ShellNewArrivalsRoute: typeof ShellNewArrivalsRoute
   ShellProfileRoute: typeof ShellProfileRoute
+  ShellScanRoute: typeof ShellScanRoute
   ShellSearchRoute: typeof ShellSearchRoute
   ShellSettingsRoute: typeof ShellSettingsRoute
   ShellIndexRoute: typeof ShellIndexRoute
   ShellComicIdRoute: typeof ShellComicIdRoute
   ShellListsIdRoute: typeof ShellListsIdRoute
+  ShellVolumesIdRoute: typeof ShellVolumesIdRoute
 }
 
 const ShellRouteChildren: ShellRouteChildren = {
@@ -339,11 +379,13 @@ const ShellRouteChildren: ShellRouteChildren = {
   ShellListsRoute: ShellListsRoute,
   ShellNewArrivalsRoute: ShellNewArrivalsRoute,
   ShellProfileRoute: ShellProfileRoute,
+  ShellScanRoute: ShellScanRoute,
   ShellSearchRoute: ShellSearchRoute,
   ShellSettingsRoute: ShellSettingsRoute,
   ShellIndexRoute: ShellIndexRoute,
   ShellComicIdRoute: ShellComicIdRoute,
   ShellListsIdRoute: ShellListsIdRoute,
+  ShellVolumesIdRoute: ShellVolumesIdRoute,
 }
 
 const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)

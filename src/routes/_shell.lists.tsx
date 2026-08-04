@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Lock, Globe, Plus, Bookmark, BookOpen, ListChecks } from "lucide-react";
+import { Lock, Globe, Plus, Bookmark, BookOpen, ListChecks, Users } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMyLists, useCreateList } from "@/hooks/useLists";
 import { getPublisherAccent } from "@/lib/comic-adapters";
@@ -51,6 +52,11 @@ const TYPE_ICON: Record<ListType, typeof Bookmark> = {
   wishlist: Bookmark,
   reading: BookOpen,
   custom: ListChecks,
+};
+
+const ROLE_LABEL: Record<"editor" | "viewer", string> = {
+  editor: "Editor",
+  viewer: "Viewer",
 };
 
 function NewListDialog() {
@@ -174,8 +180,14 @@ function Lists() {
                       <Icon className="h-3 w-3" /> {TYPE_LABEL[list.type]}
                     </span>
                   </div>
-                  <CardHeader>
+                  <CardHeader className="flex-row items-center justify-between gap-2">
                     <CardTitle className="font-display tracking-wide">{list.name}</CardTitle>
+                    {list.myRole !== "owner" && (
+                      <Badge variant="outline" className="shrink-0 gap-1 text-[10px]">
+                        <Users className="h-3 w-3" />
+                        {ROLE_LABEL[list.myRole]}
+                      </Badge>
+                    )}
                   </CardHeader>
                   <CardContent className="pt-0">
                     <p className="line-clamp-2 text-sm text-muted-foreground">{list.description ?? ""}</p>

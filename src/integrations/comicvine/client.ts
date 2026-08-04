@@ -133,6 +133,43 @@ async function getIssuesOfVolume(
   return results.map((r) => ({ ...r, resource_type: "issue" as const }));
 }
 
+const CV_MAX_PAGE_SIZE = 100;
+
+/** Every issue of a volume, oldest first, paginating past CV's 100-per-page
+ * cap as needed. Basic fields only — no writer credits (see
+ * getIssueDetailsBatch for that, which costs one call per issue and is the
+ * expensive part of run derivation). */
+export async function getAllIssuesOfVolume(volumeId: number): Promise<CvSearchIssue[]> {
+  const all: CvSearchIssue[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await getIssuesOfVolume(volumeId, offset, CV_MAX_PAGE_SIZE);
+    all.push(...page);
+    if (page.length < CV_MAX_PAGE_SIZE) break;
+    offset += CV_MAX_PAGE_SIZE;
+  }
+  return all;
+}
+
+const CREDIT_FETCH_BATCH_SIZE = 50;
+
+/** Full detail (incl. person_credits) for each issue, one CV call per
+ * issue, in batches. This is the expensive step in run derivation — only
+ * call it from an explicit user-triggered action, never automatically. */
+export async function getIssueDetailsBatch(
+  issues: CvSearchIssue[],
+): Promise<CvIssueDetail[]> {
+  const results: CvIssueDetail[] = [];
+  for (let i = 0; i < issues.length; i += CREDIT_FETCH_BATCH_SIZE) {
+    const batch = issues.slice(i, i + CREDIT_FETCH_BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map((issue) => getIssueDetail(issue.api_detail_url)),
+    );
+    results.push(...batchResults);
+  }
+  return results;
+}
+
 /** Pulls the same `[offset, offset+perVolumeLimit)` issue slice from each
  * given volume and flattens the result — the shared paging cursor behind
  * both the initial search batch and "load more". */

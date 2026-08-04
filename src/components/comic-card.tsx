@@ -69,10 +69,12 @@ function UnimportedComicCard({
   comic,
   compact,
   detailUrl,
+  onImported,
 }: {
   comic: Comic;
   compact: boolean;
   detailUrl: string;
+  onImported?: (issueId: string) => void;
 }) {
   const navigate = useNavigate();
   const importIssue = useImportComicVineIssue();
@@ -83,6 +85,7 @@ function UnimportedComicCard({
       { detailUrl },
       {
         onSuccess: ({ issueId }) => {
+          onImported?.(issueId);
           navigate({ to: "/comic/$id", params: { id: issueId } });
         },
         onError: () => {
@@ -112,13 +115,22 @@ function UnimportedComicCard({
   );
 }
 
-export function ComicCard({ comic, compact = false }: { comic: Comic; compact?: boolean }) {
+export function ComicCard({
+  comic,
+  compact = false,
+  onImported,
+}: {
+  comic: Comic;
+  compact?: boolean;
+  onImported?: (issueId: string) => void;
+}) {
   if (comic.comicVineDetailUrl) {
     return (
       <UnimportedComicCard
         comic={comic}
         compact={compact}
         detailUrl={comic.comicVineDetailUrl}
+        onImported={onImported}
       />
     );
   }

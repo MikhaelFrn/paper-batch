@@ -117,9 +117,9 @@ function parseIssueNumber(n: string | null): number | null {
   return Number.isFinite(num) ? num : null;
 }
 
-type ServiceClient = ReturnType<typeof getSupabaseServiceClient>;
+export type ServiceClient = ReturnType<typeof getSupabaseServiceClient>;
 
-async function upsertPublisher(
+export async function upsertPublisher(
   supabase: ServiceClient,
   cv: CvPublisherSummary,
 ): Promise<string> {
@@ -167,7 +167,7 @@ async function upsertPublisher(
   return inserted.data.id;
 }
 
-async function resolveSeries(
+export async function resolveSeries(
   supabase: ServiceClient,
   publisherId: string,
   volumeName: string,
@@ -198,7 +198,7 @@ async function resolveSeries(
   return inserted.data.id;
 }
 
-async function upsertVolume(
+export async function upsertVolume(
   supabase: ServiceClient,
   cv: CvVolumeDetail,
   seriesId: string,
@@ -233,7 +233,7 @@ async function upsertVolume(
   return inserted.data.id;
 }
 
-async function upsertIssue(
+export async function upsertIssue(
   supabase: ServiceClient,
   cv: CvIssueDetail,
   volumeId: string,
@@ -270,39 +270,40 @@ async function upsertIssue(
   return { id: inserted.data.id, isNew: true };
 }
 
-async function upsertCreator(
+export async function upsertCreator(
   supabase: ServiceClient,
   cv: { id: number; name: string },
 ): Promise<string> {
-  const existing = await supabase
-    .from("creators")
-    .select("id")
-    .eq("comicvine_id", cv.id)
-    .maybeSingle();
-  if (existing.data) return existing.data.id;
-
+  // Atomic upsert, not select-then-insert: run derivation imports many
+  // issues in parallel, and issues sharing the same writer (the common
+  // case) would otherwise race — both see "doesn't exist yet" and both
+  // try to insert, and the second fails on the comicvine_id unique
+  // constraint. onConflict makes this safe under concurrency.
   const { first_name, last_name } = splitPersonName(cv.name);
-  const inserted = await supabase
+  const upserted = await supabase
     .from("creators")
-    .insert({
-      first_name,
-      last_name,
-      comicvine_id: cv.id,
-      api_source: "comicvine",
-      synced_at: new Date().toISOString(),
-      external_metadata: { comicvine_name: cv.name },
-    })
+    .upsert(
+      {
+        first_name,
+        last_name,
+        comicvine_id: cv.id,
+        api_source: "comicvine",
+        synced_at: new Date().toISOString(),
+        external_metadata: { comicvine_name: cv.name },
+      },
+      { onConflict: "comicvine_id" },
+    )
     .select("id")
     .single();
-  if (inserted.error || !inserted.data) {
-    throw new ServiceError("Failed to create creator", {
-      cause: inserted.error,
+  if (upserted.error || !upserted.data) {
+    throw new ServiceError("Failed to upsert creator", {
+      cause: upserted.error,
     });
   }
-  return inserted.data.id;
+  return upserted.data.id;
 }
 
-async function linkCreators(
+export async function linkCreators(
   supabase: ServiceClient,
   issueId: string,
   credits: CvPersonCredit[],

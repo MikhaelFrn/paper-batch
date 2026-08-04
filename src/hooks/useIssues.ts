@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { Issue, IssueWithRelations } from "@/lib/types";
+import type { IssueWithRelations } from "@/lib/types";
 import {
   getIssue,
   listIssuesByVolume,
@@ -15,7 +15,7 @@ export function useRecentIssues(limit?: number) {
 }
 
 export function useIssuesByVolume(volumeId: string | undefined) {
-  return useQuery<Issue[]>({
+  return useQuery<IssueWithRelations[]>({
     queryKey: queryKeys.issues.byVolume(volumeId ?? "unknown"),
     queryFn: () => listIssuesByVolume(volumeId as string),
     enabled: !!volumeId,

@@ -1,13 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Bookmark, BookOpen, Heart, Share2, Star } from "lucide-react";
+import { Bookmark, BookOpen, Heart, Star, Waypoints } from "lucide-react";
 import { ComicCard, PublisherBadge, RatingStars } from "@/components/comic-card";
 import { ComicCover } from "@/components/comic-cover";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useIssue, useRecentIssues } from "@/hooks/useIssues";
 import { useMyUserComicByIssue, useUpsertMyUserComic } from "@/hooks/useUserComics";
 import { useAddIssueToDefaultList } from "@/hooks/useLists";
+import { useRunsForIssue } from "@/hooks/useRuns";
 import {
   useFavoritePublishers,
   useFavoriteSeries,
@@ -42,6 +44,7 @@ function ComicDetail() {
   const issueQ = useIssue(id);
   const userComicQ = useMyUserComicByIssue(id);
   const recent = useRecentIssues(24);
+  const runsQ = useRunsForIssue(id);
   const favSeries = useFavoriteSeries();
   const favPublishers = useFavoritePublishers();
   const addToWishlist = useAddIssueToDefaultList();
@@ -76,6 +79,10 @@ function ComicDetail() {
     .filter((i) => i.id !== comic.id)
     .slice(0, 6)
     .map((i) => issueToComic(i));
+
+  const issueRuns = runsQ.data ?? [];
+  const primaryRun = issueRuns[0];
+  const volumeId = issueQ.data.volume?.id;
 
   const seriesId = issueQ.data.volume?.series?.id;
   const publisherId = issueQ.data.volume?.series?.publisher?.id;
@@ -146,7 +153,7 @@ function ComicDetail() {
               <PublisherBadge publisher={comic.publisher} />
               <span className="rounded-md bg-black/40 px-2 py-0.5 font-mono text-xs">Vol. {comic.volume}</span>
               <span className="rounded-md bg-black/40 px-2 py-0.5 font-mono text-xs">#{comic.issue}</span>
-              {comic.run && <span className="rounded-md bg-black/40 px-2 py-0.5 text-xs">{comic.run}</span>}
+              {primaryRun && <span className="rounded-md bg-black/40 px-2 py-0.5 text-xs">{primaryRun.name}</span>}
             </div>
             <div className="text-xs uppercase tracking-widest text-white/80">{comic.series}</div>
             <h1 className="font-display mt-1 text-4xl leading-tight tracking-wide sm:text-5xl">{comic.title}</h1>
@@ -176,7 +183,6 @@ function ComicDetail() {
               <Button variant={isFavPublisher ? "default" : "outline"} onClick={handleToggleFavPublisher} disabled={toggleFavPublisher.isPending}>
                 <Star className="h-4 w-4" />{isFavPublisher ? "Publisher favorited" : "Favorite publisher"}
               </Button>
-              <Button variant="ghost" size="icon"><Share2 className="h-4 w-4" /></Button>
             </div>
           </div>
         </div>
@@ -192,7 +198,7 @@ function ComicDetail() {
               <Field label="Series" value={comic.series} />
               <Field label="Volume" value={comic.volume} />
               <Field label="Issue" value={`#${comic.issue}`} />
-              <Field label="Run" value={comic.run ?? "—"} />
+              <Field label="Run" value={primaryRun?.name ?? "—"} />
               <Field label="Publisher" value={comic.publisher} />
               <Field label="Released" value={new Date(comic.releaseDate).toLocaleDateString()} />
               <Field label="Writer(s)" value={comic.writers.join(", ")} />
@@ -201,11 +207,46 @@ function ComicDetail() {
             </div>
           </div>
           <div className="space-y-4 rounded-xl border border-border/60 bg-card/60 p-5">
-            <h2 className="font-display text-lg tracking-wide">Story</h2>
+            <h2 className="font-display text-lg tracking-wide">Runs</h2>
             <Separator />
-            <Field label="Characters" value={comic.characters.length ? <div className="flex flex-wrap gap-1.5">{comic.characters.map((c) => <span key={c} className="rounded-md border border-border bg-muted/40 px-2 py-0.5 text-xs">{c}</span>)}</div> : "—"} />
-            <Field label="Teams" value={comic.teams.length ? <div className="flex flex-wrap gap-1.5">{comic.teams.map((t) => <span key={t} className="rounded-md border border-border bg-muted/40 px-2 py-0.5 text-xs">{t}</span>)}</div> : "—"} />
-            <Field label="Story arcs" value={comic.storyArcs.length ? <div className="flex flex-wrap gap-1.5">{comic.storyArcs.map((s) => <span key={s} className="rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-xs text-accent">{s}</span>)}</div> : "—"} />
+            {runsQ.isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : issueRuns.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                This issue hasn't been analyzed into a run yet.
+                {volumeId && (
+                  <>
+                    {" "}
+                    <Link to="/volumes/$id" params={{ id: volumeId }} className="text-primary hover:underline">
+                      Analyze the volume
+                    </Link>{" "}
+                    to find it.
+                  </>
+                )}
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {issueRuns.map((run) => (
+                  <Link
+                    key={run.id}
+                    to="/volumes/$id"
+                    params={{ id: volumeId ?? "" }}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-border/60 p-3 text-sm hover:border-primary/40"
+                  >
+                    <span className="flex items-center gap-2 truncate">
+                      <Waypoints className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      <span className="truncate font-medium">{run.name}</span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                      {run.run_items.length} issues
+                      <Badge variant={run.status === "verified" ? "default" : "outline"} className="text-[10px]">
+                        {run.status}
+                      </Badge>
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 

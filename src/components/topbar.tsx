@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { LogOut, Search, Settings, User as UserIcon } from "lucide-react";
+import { LogOut, ScanBarcode, Search, Settings, User as UserIcon } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -68,6 +69,9 @@ export function Topbar() {
       </form>
 
       <div className="ml-auto flex items-center gap-2">
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/scan"><ScanBarcode className="h-4 w-4" />Scan</Link>
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2 rounded-full pl-1 pr-2 hover:bg-muted/60">

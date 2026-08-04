@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Search as SearchIcon } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
@@ -152,8 +152,16 @@ function SearchPage() {
           </Group>
           <Group title="Volumes" count={data.volumes.length + cvVolumesOnly.length}>
             <div className="flex flex-wrap gap-2">
-              {data.volumes.map((v) => <span key={v.id} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm">{v.name}</span>)}
-              {cvVolumesOnly.map((v) => <span key={`cv-${v.id}`} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm">{v.name}{v.start_year ? ` (${v.start_year})` : ""}</span>)}
+              {data.volumes.map((v) => (
+                <Link key={v.id} to="/volumes/$id" params={{ id: v.id }} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm hover:border-primary/40">
+                  {v.name}
+                </Link>
+              ))}
+              {cvVolumesOnly.map((v) => (
+                <Link key={`cv-${v.id}`} to="/volumes/$id" params={{ id: `cv-${v.id}` }} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm hover:border-primary/40">
+                  {v.name}{v.start_year ? ` (${v.start_year})` : ""}
+                </Link>
+              ))}
             </div>
           </Group>
           <Group title="Creators" count={data.creators.length}>

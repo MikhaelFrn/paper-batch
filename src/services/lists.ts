@@ -6,21 +6,47 @@ import type {
   ListRow,
   ListUpdate,
   ListWithItems,
+  ListWithRole,
 } from "@/lib/types";
 import { requireUserId, unwrap, unwrapMaybe } from "./_utils";
 
 const LIST_WITH_ITEMS =
   "*, list_items(added_at, list_id, issue_id, issue:issues(*, volume:volumes(*, series:series(*, publisher:publishers(*))), issue_creators(role, creator:creators(*))))" as const;
 
-export async function listMyLists(): Promise<ListRow[]> {
+/** Lists that belong to the current user's "My Lists" page: everything they
+ * own, plus everything they were added to as a collaborator (viewer or
+ * editor) — a list_members row is enough, ownership isn't required to see
+ * it here. Two queries rather than one embedded join: owned lists may
+ * predate createList() registering the owner in list_members (see the
+ * comment there), so owner_id is still the source of truth for those. */
+export async function listMyLists(): Promise<ListWithRole[]> {
   const uid = await requireUserId();
-  return unwrap(
-    await supabase
-      .from("lists")
-      .select("*")
-      .eq("owner_id", uid)
-      .order("created_at", { ascending: false }),
-    "Failed to load lists",
+
+  const [ownedResult, memberRowsResult] = await Promise.all([
+    supabase.from("lists").select("*").eq("owner_id", uid),
+    supabase.from("list_members").select("list_id, role").eq("user_id", uid),
+  ]);
+  const owned = unwrap(ownedResult, "Failed to load lists");
+  const memberRows = unwrap(memberRowsResult, "Failed to load list memberships");
+
+  const roleByListId = new Map(memberRows.map((m) => [m.list_id, m.role]));
+  const ownedIds = new Set(owned.map((l) => l.id));
+  const sharedIds = memberRows.map((m) => m.list_id).filter((id) => !ownedIds.has(id));
+
+  const shared = sharedIds.length
+    ? unwrap(
+        await supabase.from("lists").select("*").in("id", sharedIds),
+        "Failed to load shared lists",
+      )
+    : [];
+
+  const withRoles: ListWithRole[] = [
+    ...owned.map((l) => ({ ...l, myRole: roleByListId.get(l.id) ?? "owner" })),
+    ...shared.map((l) => ({ ...l, myRole: roleByListId.get(l.id) ?? "viewer" })),
+  ];
+
+  return withRoles.sort(
+    (a, b) => +new Date(b.created_at ?? 0) - +new Date(a.created_at ?? 0),
   );
 }
 

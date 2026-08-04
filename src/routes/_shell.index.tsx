@@ -45,7 +45,7 @@ function StatCard({ icon: Icon, label, value, tone }: { icon: typeof Library; la
 function SectionHeader({ title, to }: { title: string; to?: string }) {
   return (
     <div className="mb-3 flex items-end justify-between gap-2">
-      <h2 className="font-display text-xl tracking-wide">{title}</h2>
+      <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
       {to && (
         <Link to={to} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary">
           View all <ArrowRight className="h-3.5 w-3.5" />
@@ -143,7 +143,7 @@ function Dashboard() {
       <section className="grid gap-6 lg:grid-cols-3">
         <Card className="border-border/60 lg:col-span-2">
           <CardHeader className="flex-row items-center justify-between">
-            <CardTitle className="font-display tracking-wide">Wishlist preview</CardTitle>
+            <CardTitle className="text-lg">Wishlist preview</CardTitle>
             <Link
               to={wishlistList ? "/lists/$id" : "/lists"}
               params={wishlistList ? { id: wishlistList.id } : undefined}

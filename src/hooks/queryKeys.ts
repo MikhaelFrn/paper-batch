@@ -35,6 +35,10 @@ export const queryKeys = {
     all: ["runs"] as const,
     bySeries: (seriesId: string) =>
       [...queryKeys.runs.all, "series", seriesId] as const,
+    byVolume: (volumeId: string) =>
+      [...queryKeys.runs.all, "volume", volumeId] as const,
+    byIssue: (issueId: string) =>
+      [...queryKeys.runs.all, "issue", issueId] as const,
     detail: (id: string) => [...queryKeys.runs.all, id] as const,
   },
   issues: {
