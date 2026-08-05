@@ -5,6 +5,7 @@ import {
   Sparkles,
   ListChecks,
   Heart,
+  ScanBarcode,
   Search,
   User,
   Settings,
@@ -28,6 +29,7 @@ const main = [
   { title: "Inventory", url: "/inventory", icon: Library },
   { title: "New Arrivals", url: "/new-arrivals", icon: Sparkles },
   { title: "Search", url: "/search", icon: Search },
+  { title: "Scan a comic", url: "/scan", icon: ScanBarcode },
 ];
 
 const collections = [

@@ -81,6 +81,18 @@ export function getPublisherAccent(publisher: string | null | undefined): string
   return "linear-gradient(135deg, oklch(0.35 0.05 260), oklch(0.20 0.05 260))";
 }
 
+// Mirrors services/comicvine.ts's normalizeSeriesName (kept separate rather
+// than imported — that module expects a server-side Supabase client through
+// most of its exports, not something to pull into client-rendered code just
+// for this one pure string helper).
+export function normalizeSeriesName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/^the\s+/, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 // ---------- Adapters (typed → UI Comic) ----------
 
 function creatorName(c: Creator | null): string {

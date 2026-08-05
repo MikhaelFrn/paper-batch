@@ -14,6 +14,9 @@ import { issueToComic, cvIssueToComic } from "@/lib/comic-adapters";
 import type { CvSearchIssue } from "@/integrations/comicvine/types";
 
 export const Route = createFileRoute("/_shell/search")({
+  validateSearch: (search: Record<string, unknown>): { q?: string } => ({
+    q: typeof search.q === "string" ? search.q : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Search · Comic Vault" },
@@ -26,7 +29,17 @@ export const Route = createFileRoute("/_shell/search")({
 });
 
 function SearchPage() {
-  const [q, setQ] = useState("");
+  const { q: initialQ } = Route.useSearch();
+  const [q, setQ] = useState(initialQ ?? "");
+  // Re-seed when arriving with a new ?q= (e.g. a second topbar search while
+  // already on this page) — but only in response to that, never overwrite
+  // what the user is actively typing here.
+  useEffect(() => {
+    if (initialQ !== undefined && initialQ !== q) {
+      setQ(initialQ);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQ]);
   const debouncedQ = useDebouncedValue(q, 400);
   const search = useSearch(debouncedQ, { limit: 20 });
   const cvSearch = useComicVineSearch(debouncedQ);

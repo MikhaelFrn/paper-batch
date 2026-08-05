@@ -13,6 +13,7 @@ import {
   deleteList,
   getList,
   getOrCreateDefaultList,
+  isIssueInList,
   listListMembers,
   listMyLists,
   removeIssueFromList,
@@ -90,6 +91,14 @@ export function useAddIssueToDefaultList() {
       qc.invalidateQueries({ queryKey: queryKeys.lists.mine() });
       qc.invalidateQueries({ queryKey: queryKeys.lists.detail(list.id) });
     },
+  });
+}
+
+export function useIsIssueInList(listId: string | undefined, issueId: string | undefined) {
+  return useQuery<boolean>({
+    queryKey: queryKeys.lists.membership(listId ?? "unknown", issueId ?? "unknown"),
+    queryFn: () => isIssueInList(listId as string, issueId as string),
+    enabled: !!listId && !!issueId,
   });
 }
 

@@ -12,6 +12,14 @@ import { unwrap } from "./_utils";
 
 const ISSUE_WITH_RELATIONS =
   "*, volume:volumes(*, series:series(*, publisher:publishers(*))), issue_creators(role, creator:creators(*))" as const;
+// `!inner` on volume/series, not the default left-outer embed — filtering
+// on an embedded resource's column only constrains which *parent* rows
+// come back when the join is forced inner (confirmed live: without
+// `!inner` this exact filter is silently ignored and returns every issue,
+// not just matches). Every issue has a volume in practice, so the inner
+// join doesn't drop anything a left join wouldn't already have included.
+const ISSUE_WITH_RELATIONS_SERIES_INNER =
+  "*, volume:volumes!inner(*, series:series!inner(*, publisher:publishers(*))), issue_creators(role, creator:creators(*))" as const;
 // `runs` has no direct FK to `series` — a run relates to volumes/issues only
 // indirectly through `run_items`. Don't join a relationship that doesn't
 // exist in the schema.
@@ -52,7 +60,8 @@ export async function searchAll(
   const like = `%${q}%`;
 
   const [
-    issuesRes,
+    issuesByFieldRes,
+    issuesBySeriesRes,
     seriesRes,
     runsRes,
     volumesRes,
@@ -63,6 +72,17 @@ export async function searchAll(
       .from("issues")
       .select(ISSUE_WITH_RELATIONS)
       .or(`title.ilike.${like},issue_number.ilike.${like}`)
+      .limit(limit),
+    // A comic's own title often doesn't repeat its series name (e.g. a
+    // one-word chapter title, or ComicVine leaving it blank so it falls
+    // back to just "SeriesName #N" — that fallback happens to contain the
+    // series name, but a real per-issue title doesn't have to). Searching
+    // "dark knights" needs to find those issues via the series they belong
+    // to, not just ones whose own title/issue_number field matches.
+    supabase
+      .from("issues")
+      .select(ISSUE_WITH_RELATIONS_SERIES_INNER)
+      .ilike("volume.series.name", like)
       .limit(limit),
     supabase
       .from("series")
@@ -83,8 +103,15 @@ export async function searchAll(
     supabase.from("publishers").select("*").ilike("name", like).limit(limit),
   ]);
 
+  const issuesByField = unwrap(issuesByFieldRes, "Failed to search issues") as IssueWithRelations[];
+  const issuesBySeries = unwrap(issuesBySeriesRes, "Failed to search issues by series") as IssueWithRelations[];
+  const issuesById = new Map<string, IssueWithRelations>();
+  for (const issue of [...issuesByField, ...issuesBySeries]) {
+    issuesById.set(issue.id, issue);
+  }
+
   return {
-    issues: unwrap(issuesRes, "Failed to search issues") as IssueWithRelations[],
+    issues: [...issuesById.values()].slice(0, limit),
     series: unwrap(seriesRes, "Failed to search series") as SeriesWithPublisher[],
     runs: unwrap(runsRes, "Failed to search runs") as RunWithRelations[],
     volumes: unwrap(volumesRes, "Failed to search volumes") as Volume[],

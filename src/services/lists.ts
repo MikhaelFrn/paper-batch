@@ -61,6 +61,25 @@ export async function getList(id: string): Promise<ListWithItems | null> {
   ) as ListWithItems | null;
 }
 
+/** Direct existence check — deliberately not derived from getList()'s
+ * nested list_items embed. Simpler and cheaper (no need to pull the whole
+ * list plus every item's full issue/volume/series/creator relations just
+ * to answer one boolean), and sidesteps embedded-resource RLS/PostgREST
+ * quirks entirely by querying list_items itself instead of through a join. */
+export async function isIssueInList(
+  listId: string,
+  issueId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("list_items")
+    .select("issue_id")
+    .eq("list_id", listId)
+    .eq("issue_id", issueId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return !!data;
+}
+
 export interface CreateListInput {
   name: string;
   description?: string | null;
@@ -147,10 +166,21 @@ export async function addIssueToList(
   listId: string,
   issueId: string,
 ): Promise<void> {
+  // Plain insert, not upsert: list_items' primary key is (list_id,
+  // issue_id) with no other mutable columns worth "updating", so there's
+  // no real upsert semantics needed here — just "does this row exist".
+  // Upserting without onConflict resolves to INSERT ... ON CONFLICT DO
+  // UPDATE, and that implicit UPDATE path needs its own RLS policy (which
+  // this table doesn't have) even though nothing is actually changing —
+  // confirmed live, re-adding an issue already in a list 403'd. A 23505
+  // (unique_violation) here just means it's already in the list, which
+  // isn't an error from the caller's point of view.
   const { error } = await supabase
     .from("list_items")
-    .upsert({ list_id: listId, issue_id: issueId });
-  if (error) throw new Error(error.message);
+    .insert({ list_id: listId, issue_id: issueId });
+  if (error && error.code !== "23505") {
+    throw new Error(error.message);
+  }
 }
 
 export async function removeIssueFromList(

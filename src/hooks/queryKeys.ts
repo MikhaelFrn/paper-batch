@@ -73,6 +73,12 @@ export const queryKeys = {
     mine: () => [...queryKeys.lists.all, "mine"] as const,
     detail: (id: string) => [...queryKeys.lists.all, id] as const,
     members: (id: string) => [...queryKeys.lists.all, id, "members"] as const,
+    // Nested under detail(id) on purpose — invalidating detail(id) (already
+    // done by every add/remove mutation) cascades to this too via React
+    // Query's default prefix-matching invalidation, no extra invalidation
+    // calls needed anywhere.
+    membership: (id: string, issueId: string) =>
+      [...queryKeys.lists.detail(id), "membership", issueId] as const,
   },
   search: {
     all: ["search"] as const,

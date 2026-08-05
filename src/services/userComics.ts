@@ -4,7 +4,7 @@ import type {
   UserComic,
   UserComicUpdate,
 } from "@/lib/types";
-import { requireUserId, unwrap, unwrapMaybe } from "./_utils";
+import { requireUserId, throwIfError, unwrap, unwrapMaybe } from "./_utils";
 
 const USER_COMIC_WITH_ISSUE =
   "*, issue:issues(*, volume:volumes(*, series:series(*, publisher:publishers(*))), issue_creators(role, creator:creators(*)))" as const;
@@ -74,6 +74,54 @@ export async function upsertMyUserComic(
     await supabase.from("user_comics").insert(payload).select("*").single(),
     "Failed to create user comic",
   );
+}
+
+/** Sets `owned` for many issues in one action (e.g. "mark #1-45 as owned"
+ * from a volume page) — two batched calls total regardless of how many
+ * issues are selected, not one round trip per issue. Existing collection
+ * entries are updated in place (read/rating/notes untouched); issues with
+ * no entry yet get a fresh one with those fields defaulted. */
+export async function bulkSetOwned(
+  issueIds: string[],
+  owned: boolean,
+): Promise<void> {
+  const uid = await requireUserId();
+  if (issueIds.length === 0) return;
+
+  const existing = await unwrap(
+    await supabase
+      .from("user_comics")
+      .select("issue_id")
+      .eq("user_id", uid)
+      .in("issue_id", issueIds),
+    "Failed to check existing collection entries",
+  );
+  const existingIds = new Set(existing.map((e) => e.issue_id));
+  const toUpdate = issueIds.filter((id) => existingIds.has(id));
+  const toInsert = issueIds.filter((id) => !existingIds.has(id));
+
+  if (toUpdate.length > 0) {
+    const result = await supabase
+      .from("user_comics")
+      .update({ owned })
+      .eq("user_id", uid)
+      .in("issue_id", toUpdate);
+    throwIfError(result.error, "Failed to update owned status");
+  }
+  if (toInsert.length > 0) {
+    const result = await supabase.from("user_comics").insert(
+      toInsert.map((issueId) => ({
+        user_id: uid,
+        issue_id: issueId,
+        owned,
+        read: false,
+        rating: null,
+        notes: null,
+        purchase_date: null,
+      })),
+    );
+    throwIfError(result.error, "Failed to create collection entries");
+  }
 }
 
 export async function deleteMyUserComic(issueId: string): Promise<void> {

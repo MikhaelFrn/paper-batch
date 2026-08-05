@@ -151,7 +151,21 @@ export async function getAllIssuesOfVolume(volumeId: number): Promise<CvSearchIs
   return all;
 }
 
-const CREDIT_FETCH_BATCH_SIZE = 50;
+// ComicVine's documented hourly cap (200 requests/resource/hour) isn't the
+// only limit — it also does its own "velocity" burst detection, separate
+// from the hourly count, that blocks a run of near-simultaneous requests
+// with a 420 ("Rate limit exceeded. Slow down cowboy.") — confirmed live,
+// triggered by this function's old batch size of 50 truly concurrent
+// requests. A smaller batch plus a pause between batches spreads requests
+// out over time instead of firing them in one burst, which is what the
+// velocity check actually seems to react to (the hourly total is unchanged
+// either way — this doesn't help if you're already over that).
+const CREDIT_FETCH_BATCH_SIZE = 10;
+const CREDIT_FETCH_BATCH_DELAY_MS = 500;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /** Full detail (incl. person_credits) for each issue, one CV call per
  * issue, in batches. This is the expensive step in run derivation — only
@@ -161,6 +175,7 @@ export async function getIssueDetailsBatch(
 ): Promise<CvIssueDetail[]> {
   const results: CvIssueDetail[] = [];
   for (let i = 0; i < issues.length; i += CREDIT_FETCH_BATCH_SIZE) {
+    if (i > 0) await sleep(CREDIT_FETCH_BATCH_DELAY_MS);
     const batch = issues.slice(i, i + CREDIT_FETCH_BATCH_SIZE);
     const batchResults = await Promise.all(
       batch.map((issue) => getIssueDetail(issue.api_detail_url)),

@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { Bookmark, BookOpen, Heart, ListPlus, Plus, Star, Waypoints } from "lucide-react";
 import { ComicCard, PublisherBadge, RatingStars } from "@/components/comic-card";
 import { ComicCover } from "@/components/comic-cover";
@@ -11,11 +12,27 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useIssue, useRecentIssues } from "@/hooks/useIssues";
-import { useMyUserComicByIssue, useUpsertMyUserComic } from "@/hooks/useUserComics";
-import { useAddIssueToDefaultList, useAddIssueToList, useMyLists } from "@/hooks/useLists";
+import { useMyUserComicByIssue, useUpsertMyUserComic, useUserCollection } from "@/hooks/useUserComics";
+import {
+  useAddIssueToDefaultList,
+  useAddIssueToList,
+  useIsIssueInList,
+  useMyLists,
+  useRemoveIssueFromList,
+} from "@/hooks/useLists";
 import { useRunsForIssue } from "@/hooks/useRuns";
 import {
   useFavoritePublishers,
@@ -23,7 +40,8 @@ import {
   useToggleFavoritePublisher,
   useToggleFavoriteSeries,
 } from "@/hooks/useFavorites";
-import { issueToComic } from "@/lib/comic-adapters";
+import { issueToComic, normalizeSeriesName } from "@/lib/comic-adapters";
+import type { Comic } from "@/lib/comic-adapters";
 
 export const Route = createFileRoute("/_shell/comic/$id")({
   head: () => ({
@@ -97,12 +115,21 @@ function ComicDetail() {
   const userComicQ = useMyUserComicByIssue(id);
   const recent = useRecentIssues(24);
   const runsQ = useRunsForIssue(id);
+  const collection = useUserCollection();
+  const lists = useMyLists();
+  const wishlistList = lists.data?.find((l) => l.type === "wishlist");
+  // `id` (the route param) rather than `comic.id` — comic isn't defined
+  // until after the loading/not-found early returns below, and hooks can't
+  // be called conditionally. They're the same value once comic exists.
+  const isWishlistedQ = useIsIssueInList(wishlistList?.id, id);
   const favSeries = useFavoriteSeries();
   const favPublishers = useFavoritePublishers();
   const addToWishlist = useAddIssueToDefaultList();
+  const removeFromList = useRemoveIssueFromList();
   const upsertUserComic = useUpsertMyUserComic();
   const toggleFavSeries = useToggleFavoriteSeries();
   const toggleFavPublisher = useToggleFavoritePublisher();
+  const [similarOwned, setSimilarOwned] = useState<Comic | null>(null);
 
   if (issueQ.isLoading) {
     return <div className="py-20 text-center text-sm text-muted-foreground">Loading…</div>;
@@ -140,8 +167,19 @@ function ComicDetail() {
   const publisherId = issueQ.data.volume?.series?.publisher?.id;
   const isFavSeries = !!seriesId && (favSeries.data ?? []).some((s) => s.id === seriesId);
   const isFavPublisher = !!publisherId && (favPublishers.data ?? []).some((p) => p.id === publisherId);
+  const isWishlisted = !!isWishlistedQ.data;
 
   const handleWishlist = () => {
+    if (isWishlisted && wishlistList) {
+      removeFromList.mutate(
+        { listId: wishlistList.id, issueId: comic.id },
+        {
+          onSuccess: () => toast.success("Removed from wishlist"),
+          onError: () => toast.error("Couldn't remove from wishlist"),
+        },
+      );
+      return;
+    }
     addToWishlist.mutate(
       { type: "wishlist", issueId: comic.id },
       {
@@ -151,7 +189,7 @@ function ComicDetail() {
     );
   };
 
-  const handleToggleOwned = () => {
+  const markOwned = () => {
     upsertUserComic.mutate(
       { issueId: comic.id, owned: !comic.owned },
       {
@@ -159,6 +197,38 @@ function ComicDetail() {
         onError: () => toast.error("Couldn't update"),
       },
     );
+  };
+
+  /** Different local issue row, same series + issue number, already owned
+   * — the case that comes up when ComicVine tracks a variant cover or
+   * reprint as a separate issue entirely. Matched on issue *number*, not
+   * fuzzy title similarity, specifically so e.g. #1 and #2 of the same
+   * series never get flagged against each other. */
+  const findSimilarOwnedIssue = (): Comic | null => {
+    const targetSeries = normalizeSeriesName(comic.series);
+    const targetIssueNum = String(comic.issue).trim().toLowerCase();
+    for (const entry of collection.data ?? []) {
+      if (!entry.owned || !entry.issue || entry.issue.id === comic.id) continue;
+      const other = issueToComic(entry.issue);
+      if (
+        normalizeSeriesName(other.series) === targetSeries &&
+        String(other.issue).trim().toLowerCase() === targetIssueNum
+      ) {
+        return other;
+      }
+    }
+    return null;
+  };
+
+  const handleToggleOwned = () => {
+    if (!comic.owned) {
+      const similar = findSimilarOwnedIssue();
+      if (similar) {
+        setSimilarOwned(similar);
+        return;
+      }
+    }
+    markOwned();
   };
 
   const handleToggleRead = () => {
@@ -220,8 +290,19 @@ function ComicDetail() {
             <p className="mt-4 max-w-2xl text-sm leading-relaxed text-white/85">{comic.synopsis}</p>
 
             <div className="mt-6 flex flex-wrap gap-2">
-              <Button onClick={handleWishlist} disabled={addToWishlist.isPending}>
-                <Bookmark className="h-4 w-4" />{addToWishlist.isPending ? "Adding…" : "Wishlist"}
+              <Button
+                variant={isWishlisted ? "default" : "secondary"}
+                onClick={handleWishlist}
+                disabled={addToWishlist.isPending || removeFromList.isPending || isWishlistedQ.isFetching}
+              >
+                <Bookmark className="h-4 w-4" />
+                {addToWishlist.isPending
+                  ? "Adding…"
+                  : removeFromList.isPending
+                    ? "Removing…"
+                    : isWishlisted
+                      ? "In wishlist ✓"
+                      : "Wishlist"}
               </Button>
               <AddToListMenu issueId={comic.id} />
               <Button variant={comic.owned ? "default" : "secondary"} onClick={handleToggleOwned} disabled={upsertUserComic.isPending}>
@@ -317,6 +398,34 @@ function ComicDetail() {
           </div>
         </section>
       </div>
+
+      <AlertDialog open={!!similarOwned} onOpenChange={(open) => { if (!open) setSimilarOwned(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Already own something similar?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {similarOwned && (
+                <>
+                  You already have <strong>{similarOwned.series} #{similarOwned.issue}</strong> marked as
+                  owned — this looks like the same issue, possibly a different printing or cover variant.
+                  Mark this one as owned too?
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setSimilarOwned(null);
+                markOwned();
+              }}
+            >
+              Proceed anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { IssueWithRelations } from "@/lib/types";
 import { unwrap, unwrapMaybe } from "./_utils";
 
-const ISSUE_WITH_RELATIONS =
+export const ISSUE_WITH_RELATIONS =
   "*, volume:volumes(*, series:series(*, publisher:publishers(*))), issue_creators(role, creator:creators(*))" as const;
 
 export async function listRecentIssues(limit = 24): Promise<IssueWithRelations[]> {

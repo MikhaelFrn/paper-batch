@@ -21,6 +21,7 @@ export const Route = createFileRoute("/_shell/settings")({
 
 function Settings() {
   const [theme, setTheme] = useState("dark");
+
   return (
     <div>
       <PageHeader eyebrow="Preferences" title="Settings" description="Theme and account preferences." />

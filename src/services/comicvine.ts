@@ -19,6 +19,7 @@ import type {
 import { getSupabaseServerClient } from "@/integrations/supabase/server-client";
 import { getSupabaseServiceClient } from "@/integrations/supabase/service-client";
 import { ServiceError } from "@/lib/types";
+import { hashCoverImage } from "./coverHash";
 
 export type ComicVineSearchResults = ComicVineIssueSearchResult;
 
@@ -247,13 +248,14 @@ export async function upsertIssue(
   if (existing.data) return { id: existing.data.id, isNew: false };
 
   const title = cv.name?.trim() || `${volumeName} #${cv.issue_number ?? "?"}`;
+  const coverUrl = cv.image?.medium_url ?? null;
   const inserted = await supabase
     .from("issues")
     .insert({
       title,
       issue_number: cv.issue_number,
       release_date: cv.store_date ?? cv.cover_date,
-      cover_url: cv.image?.medium_url ?? null,
+      cover_url: coverUrl,
       volume_id: volumeId,
       comicvine_id: cv.id,
       api_source: "comicvine",
@@ -267,7 +269,36 @@ export async function upsertIssue(
       cause: inserted.error,
     });
   }
+
+  if (coverUrl) {
+    await hashNewCover(supabase, inserted.data.id, coverUrl);
+  }
+
   return { id: inserted.data.id, isNew: true };
+}
+
+/** Hashes and stores a newly-imported issue's cover as it comes in, rather
+ * than relying on someone remembering to run a separate maintenance step —
+ * covers stays complete going forward with zero user action. Best-effort:
+ * a hash failure (bad image, transient network blip) must never break the
+ * actual issue import, which is what the caller is really here for. */
+async function hashNewCover(
+  supabase: ServiceClient,
+  issueId: string,
+  coverUrl: string,
+): Promise<void> {
+  try {
+    const response = await fetch(coverUrl);
+    if (!response.ok) return;
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const hash = await hashCoverImage(buffer);
+    const { error } = await supabase
+      .from("covers")
+      .insert({ issue_id: issueId, image_hash: hash });
+    if (error) console.error("Failed to store cover hash for issue", issueId, error);
+  } catch (error) {
+    console.error("Failed to hash cover for issue", issueId, error);
+  }
 }
 
 export async function upsertCreator(
