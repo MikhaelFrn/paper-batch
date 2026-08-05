@@ -17,6 +17,13 @@ const CONFIDENT_SPLIT_RATIO = 0.25;
 // homogeneous single-writer run of any length skips this entirely (see
 // isWholeVolume below).
 const MIN_ISSUES_FOR_AUTO_VERIFY = 12;
+// Below this average issues-per-segment, writer identity isn't producing a
+// meaningful split at all (e.g. an anthology one-shot where every issue has
+// a different writer) — segmenting by writer would just create a pile of
+// one-issue "runs" that don't mean anything. Anchor: a 4-issue anthology
+// with 4 different writers averages 1.0; a real short arc followed by a
+// handoff (e.g. two 2-issue stretches) averages 2.0 and should stay split.
+const ANTHOLOGY_AVG_SEGMENT_LENGTH = 1.5;
 
 export interface RunDerivationIssueInput {
   issueId: string;
@@ -40,6 +47,16 @@ interface InternalSegment {
    * "never evaluated this way" (the volume's first/last stretch, or a
    * fully homogeneous volume), which defaults to confident. */
   interruptionRatio?: number;
+  /** True for a segment produced by bridging a gap (see
+   * mergeReturningWriterGaps) — two stretches by the same writer joined
+   * across an interruption that was too big to call noise. Always forced
+   * to draft: unlike a normal boundary, "same writer resumed" is a claim
+   * about identity across a real gap, not just where one continuous
+   * stretch ends — a big enough gap (e.g. a whole unrelated multi-year era
+   * between the two stretches) means it's probably a new stint, not the
+   * same run continuing, and that's not something issue counts alone can
+   * tell apart from a short interruption. */
+  fromGapMerge?: boolean;
 }
 
 function runLengthEncode(issues: RunDerivationIssueInput[]): InternalSegment[] {
@@ -112,6 +129,51 @@ function mergeNoise(segments: InternalSegment[]): InternalSegment[] {
   }
 }
 
+/** Handles the case `mergeNoise` deliberately leaves alone: an interruption
+ * too big to call noise (e.g. a 2-issue fill-in arc inside a 6-issue
+ * volume), where the original writer resumes right after it. That's still
+ * one creative run, not two — the fill-in belongs in its own run, but the
+ * writer's two flanking stretches should end up as a single run record
+ * with a gap, not separate ones. Deliberately narrow: only merges segments
+ * immediately sandwiching a single interruption, never a writer's earlier
+ * stint reappearing much later after long, unrelated stretches by other
+ * writers — that's a new stint, not the same run continuing. */
+function mergeReturningWriterGaps(segments: InternalSegment[]): InternalSegment[] {
+  let current = segments.map((s) => ({ ...s, issueIds: [...s.issueIds] }));
+  for (;;) {
+    let mergedIndex = -1;
+    for (let i = 1; i < current.length - 1; i++) {
+      const prev = current[i - 1];
+      const interior = current[i];
+      const after = current[i + 1];
+      if (
+        prev.writerKey !== null &&
+        prev.writerKey === after.writerKey &&
+        interior.writerKey !== prev.writerKey
+      ) {
+        mergedIndex = i;
+        break;
+      }
+    }
+    if (mergedIndex === -1) return current;
+
+    const prev = current[mergedIndex - 1];
+    const interior = current[mergedIndex];
+    const after = current[mergedIndex + 1];
+    const combined: InternalSegment = {
+      writerKey: prev.writerKey,
+      issueIds: [...prev.issueIds, ...after.issueIds],
+      fromGapMerge: true,
+    };
+    current = [
+      ...current.slice(0, mergedIndex - 1),
+      combined,
+      interior,
+      ...current.slice(mergedIndex + 2),
+    ];
+  }
+}
+
 export interface RunDerivationOptions {
   /** True if the volume might still receive new issues — the final
    * segment's classification could still be revised by future data, so
@@ -125,8 +187,26 @@ export function deriveRunSegments(
 ): RunDerivationSegment[] {
   if (issues.length === 0) return [];
 
-  const merged = mergeNoise(runLengthEncode(issues));
+  const merged = mergeReturningWriterGaps(mergeNoise(runLengthEncode(issues)));
   const isWholeVolume = merged.length === 1;
+
+  if (!isWholeVolume) {
+    const avgSegmentLength = issues.length / merged.length;
+    if (avgSegmentLength <= ANTHOLOGY_AVG_SEGMENT_LENGTH) {
+      // Writer identity churns almost every issue — there's no coherent
+      // writer-based split to make. Treat it as one anthology block rather
+      // than a pile of one-issue "runs"; low confidence flags it as
+      // unreviewed rather than claiming a real single-writer run.
+      return [
+        {
+          writerKey: null,
+          issueIds: issues.map((i) => i.issueId),
+          status: "draft",
+          confidence: 0.4,
+        },
+      ];
+    }
+  }
 
   return merged.map((seg, index): RunDerivationSegment => {
     const isLast = index === merged.length - 1;
@@ -136,6 +216,9 @@ export function deriveRunSegments(
     }
     if (isWholeVolume) {
       return { writerKey: seg.writerKey, issueIds: seg.issueIds, status: "verified", confidence: 1 };
+    }
+    if (seg.fromGapMerge) {
+      return { writerKey: seg.writerKey, issueIds: seg.issueIds, status: "draft", confidence: 0.5 };
     }
     if (seg.issueIds.length < MIN_ISSUES_FOR_AUTO_VERIFY) {
       return { writerKey: seg.writerKey, issueIds: seg.issueIds, status: "draft", confidence: 0.5 };

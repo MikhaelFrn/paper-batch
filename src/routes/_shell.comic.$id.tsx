@@ -64,6 +64,29 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+/** Credit names as links into global search, so "who else did this run" is
+ * one click away instead of a manual retype — the search box ends up with
+ * exactly the name you clicked, same as typing it yourself. `pickCreators`
+ * (comic-adapters.ts) falls back to a "—" placeholder for an empty writer
+ * list; that's display-only text, not a real name, so it stays unlinked. */
+function CreatorLinks({ names, className }: { names: string[]; className?: string }) {
+  if (names.length === 0 || (names.length === 1 && names[0] === "—")) {
+    return <>—</>;
+  }
+  return (
+    <>
+      {names.map((name, i) => (
+        <span key={name}>
+          {i > 0 && ", "}
+          <Link to="/search" search={{ q: name }} className={className ?? "hover:underline"}>
+            {name}
+          </Link>
+        </span>
+      ))}
+    </>
+  );
+}
+
 /** Every other list besides the default wishlist — that one already has its
  * own quick button. Viewer-only collaborators are excluded since they can
  * see but not add to a shared list (owners/editors only, enforced by RLS
@@ -280,9 +303,9 @@ function ComicDetail() {
             <div className="text-xs uppercase tracking-widest text-white/80">{comic.series}</div>
             <h1 className="font-display mt-1 text-4xl leading-tight tracking-wide sm:text-5xl">{comic.title}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-white/85">
-              <span>By {comic.writers.join(", ")}</span>
+              <span>By <CreatorLinks names={comic.writers} /></span>
               <span>·</span>
-              <span>Art {comic.artists.join(", ") || "—"}</span>
+              <span>Art <CreatorLinks names={comic.artists} /></span>
               <span>·</span>
               <span>{new Date(comic.releaseDate).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}</span>
               {comic.rating && <><span>·</span><RatingStars value={comic.rating} /></>}
@@ -335,9 +358,23 @@ function ComicDetail() {
               <Field label="Run" value={primaryRun?.name ?? "—"} />
               <Field label="Publisher" value={comic.publisher} />
               <Field label="Released" value={new Date(comic.releaseDate).toLocaleDateString()} />
-              <Field label="Writer(s)" value={comic.writers.join(", ")} />
-              <Field label="Artist(s)" value={comic.artists.join(", ") || "—"} />
-              <Field label="Cover" value={comic.coverArtist ?? "—"} />
+              <Field
+                label="Writer(s)"
+                value={<CreatorLinks names={comic.writers} className="text-primary hover:underline" />}
+              />
+              <Field
+                label="Artist(s)"
+                value={<CreatorLinks names={comic.artists} className="text-primary hover:underline" />}
+              />
+              <Field
+                label="Cover"
+                value={
+                  <CreatorLinks
+                    names={comic.coverArtist ? [comic.coverArtist] : []}
+                    className="text-primary hover:underline"
+                  />
+                }
+              />
             </div>
           </div>
           <div className="space-y-4 rounded-xl border border-border/60 bg-card/60 p-5">

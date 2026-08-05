@@ -59,6 +59,18 @@ const ROLE_LABEL: Record<"editor" | "viewer", string> = {
   viewer: "Viewer",
 };
 
+// A shared list's banner is recolored by role so it reads at a glance
+// during a grid-scan, not just via the small text badge in the corner —
+// that's the whole point ("make lists that aren't yours more obvious").
+// Same recipe as the default gradient (135deg, two oklch stops, matching
+// lightness range) with a punchier chroma than that gradient's muted 0.05,
+// since these need to actually stand out, not just tint. Owned lists keep
+// the existing default gradient untouched.
+const ROLE_GRADIENT: Record<"editor" | "viewer", string> = {
+  editor: "linear-gradient(135deg, oklch(0.45 0.12 55), oklch(0.28 0.12 45))",
+  viewer: "linear-gradient(135deg, oklch(0.42 0.12 300), oklch(0.26 0.12 305))",
+};
+
 function NewListDialog() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -168,10 +180,14 @@ function Lists() {
           {rows.map((list) => {
             const isPublic = list.visibility === "public";
             const Icon = TYPE_ICON[list.type];
+            const bannerGradient =
+              list.myRole === "editor" || list.myRole === "viewer"
+                ? ROLE_GRADIENT[list.myRole]
+                : getPublisherAccent(null);
             return (
               <Link key={list.id} to="/lists/$id" params={{ id: list.id }}>
                 <Card className="group cursor-pointer overflow-hidden border-border/60 transition hover:border-primary/40">
-                  <div className="relative h-32 w-full" style={{ backgroundImage: getPublisherAccent(null) }}>
+                  <div className="relative h-32 w-full" style={{ backgroundImage: bannerGradient }}>
                     <div className="absolute inset-0 opacity-25 mix-blend-overlay" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.5) 1px, transparent 0)", backgroundSize: "8px 8px" }} />
                     <span className="absolute right-2 top-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] text-white">
                       {isPublic ? <Globe className="inline h-3 w-3" /> : <Lock className="inline h-3 w-3" />} {isPublic ? "Public" : "Private"}

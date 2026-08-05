@@ -31,11 +31,25 @@ async function requireAuthenticatedUser(): Promise<void> {
 /** Perceptual hash of an image via Jimp's built-in pHash plugin — robust to
  * resizing/recompression, not to rotation, cropping, or lighting changes.
  * That's the actual, honest scope of this feature: it's comparing hashes,
- * not real image recognition. */
+ * not real image recognition.
+ *
+ * `hash(2)` — base 2, i.e. the raw 64-bit string — not the default
+ * `hash()` (base 64). `compareHashes` (below) computes similarity by
+ * comparing hash strings *character by character*, which only equals a
+ * real bit-level Hamming distance when each character *is* one bit.
+ * Base-64-encoding the 64 bits first (Jimp's default) re-expresses them in
+ * a different radix, and radix conversion doesn't preserve bit-position
+ * locality — a handful of differing bits can cascade into most of the
+ * encoded characters changing, the same way 999999→1000000 differs in
+ * every digit despite being adjacent integers. Confirmed live: two
+ * synthetic images with a true 61%-similar bit hash (25/64 bits differing,
+ * a realistic amount for a real phone photo vs. a clean reference image)
+ * scored 9% through the base-64 path — base 2 is what makes the reported
+ * percentage mean what it claims to mean. */
 export async function hashCoverImage(source: Buffer | ArrayBuffer): Promise<string> {
   const { Jimp } = await loadJimp();
   const image = await Jimp.read(source as never);
-  return image.hash();
+  return image.hash(2);
 }
 
 export interface CoverMatch {
@@ -111,29 +125,45 @@ export interface BackfillCoverHashesResult {
 
 const BACKFILL_BATCH_SIZE = 5;
 
-/** One-time (well, re-runnable — it skips issues that already have a hash)
- * catch-up for issues imported before cover hashing existed. Fetches each
- * issue's cover_url and hashes it. This hits ComicVine's image CDN, not
- * their JSON API — a different, far less constrained resource than what
- * search/analyze/barcode lookups use, so it's safe to run even while the
- * API itself is rate-limited. */
-export const backfillCoverHashes = createServerFn({ method: "POST" }).handler(
-  async (): Promise<BackfillCoverHashesResult> => {
+/** Catch-up for issues imported before cover hashing existed (default,
+ * `force: false`) — skips issues that already have a hash. `force: true`
+ * instead re-hashes *every* issue with a cover, wiping existing rows
+ * first: there's no unique constraint on `covers.issue_id` to upsert
+ * against, and a forced re-hash exists specifically for cases (like the
+ * base64→binary hash-encoding fix) where every existing row is stale, not
+ * just the missing ones. Hits ComicVine's image CDN, not their JSON API —
+ * a different, far less constrained resource than what search/analyze/
+ * barcode lookups use, so it's safe to run even while the API itself is
+ * rate-limited. */
+export const backfillCoverHashes = createServerFn({ method: "POST" })
+  .validator((input?: { force?: boolean }) => input ?? {})
+  .handler(async ({ data }): Promise<BackfillCoverHashesResult> => {
     await requireAuthenticatedUser();
     const client = getSupabaseServiceClient();
+    const force = data.force ?? false;
 
     const issues = unwrap(
       await client.from("issues").select("id, cover_url").not("cover_url", "is", null),
       "Failed to load issues",
     );
-    const existing = unwrap(
-      await client.from("covers").select("issue_id"),
-      "Failed to load existing covers",
-    );
-    const alreadyHashed = new Set(existing.map((c) => c.issue_id));
-    const toProcess = issues.filter(
-      (i): i is { id: string; cover_url: string } => !!i.cover_url && !alreadyHashed.has(i.id),
-    );
+
+    let alreadyHashedCount = 0;
+    let toProcess: { id: string; cover_url: string }[];
+    if (force) {
+      const { error } = await client.from("covers").delete().gte("id", 0);
+      if (error) throw new ServiceError("Failed to clear existing cover hashes", { cause: error });
+      toProcess = issues.filter((i): i is { id: string; cover_url: string } => !!i.cover_url);
+    } else {
+      const existing = unwrap(
+        await client.from("covers").select("issue_id"),
+        "Failed to load existing covers",
+      );
+      const alreadyHashed = new Set(existing.map((c) => c.issue_id));
+      alreadyHashedCount = alreadyHashed.size;
+      toProcess = issues.filter(
+        (i): i is { id: string; cover_url: string } => !!i.cover_url && !alreadyHashed.has(i.id),
+      );
+    }
 
     let processed = 0;
     let failed = 0;
@@ -159,6 +189,5 @@ export const backfillCoverHashes = createServerFn({ method: "POST" }).handler(
       }
     }
 
-    return { processed, alreadyHashed: alreadyHashed.size, failed };
-  },
-);
+    return { processed, alreadyHashed: alreadyHashedCount, failed };
+  });

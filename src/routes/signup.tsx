@@ -3,7 +3,7 @@ import { AuthShell } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useSignUp } from "@/hooks/useAuth";
+import { useSignInWithGoogle, useSignUp } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -22,9 +22,15 @@ export const Route = createFileRoute("/signup")({
 function Signup() {
   const navigate = useNavigate();
   const register = useSignUp();
+  const signInWithGoogle = useSignInWithGoogle();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
+  const handleGoogleSignIn = () => {
+    signInWithGoogle.mutate(undefined, {
+      onError: () => toast.error("Couldn't start Google sign-in."),
+    });
+  };
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
@@ -50,6 +56,15 @@ function Signup() {
         <div><Label>Email</Label><Input type="email" placeholder="peter@dailybugle.com" value={email} onChange={(e) => setEmail(e.target.value)}/></div>
         <div><Label>Password</Label><Input type="password" placeholder="At least 8 characters" value={password} onChange={(e) => setPassword(e.target.value)}/></div>
         <Button type="submit" className="w-full">Create account</Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          disabled={signInWithGoogle.isPending}
+          onClick={handleGoogleSignIn}
+        >
+          {signInWithGoogle.isPending ? "Redirecting…" : "Continue with Google"}
+        </Button>
       </form>
     </AuthShell>
   );

@@ -14,6 +14,12 @@ dist-ssr
 .vinxi
 .tanstack/**
 .nitro
+
+# Fully regenerated from route files by the TanStack Router plugin on every
+# dev-server run — tracking it means git operations that touch it (stash,
+# checkout, merge) race a live background process rewriting it independently,
+# which is what caused the repeated stash-pop conflicts.
+src/routeTree.gen.ts
 *.local
 
 # Wrangler / Cloudflare

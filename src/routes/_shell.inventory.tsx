@@ -19,7 +19,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { useUserCollection } from "@/hooks/useUserComics";
 import { usePublishers } from "@/hooks/usePublishers";
 import { useSeriesList } from "@/hooks/useSeries";
+import { useFavoriteCreators, useFavoritePublishers, useFavoriteSeries } from "@/hooks/useFavorites";
 import { userComicToComic } from "@/lib/comic-adapters";
+import { isFavoriteIssue } from "@/lib/favorite-match";
 
 export const Route = createFileRoute("/_shell/inventory")({
   head: () => ({
@@ -33,9 +35,26 @@ export const Route = createFileRoute("/_shell/inventory")({
   component: Inventory,
 });
 
-type Sort = "recent" | "title" | "publisher" | "release" | "alpha";
+type Sort = "recent" | "publisher" | "release" | "alpha";
 
-function Filters({ publisherNames, seriesNames, pubs, setPubs, seriesSel, setSeriesSel, readOnly, setReadOnly, ownedOnly, setOwnedOnly, wishlistOnly, setWishlistOnly }: {
+// Curated allowlist of major publishers, each verified against ComicVine's
+// own `/publisher/` endpoint (not guessed) so a future import actually
+// matches these strings exactly. Everything else in the local `publishers`
+// table (small/regional imprints, foreign reprint editions like "Panini
+// Verlag" or "Marvel UK/Panini UK") gets grouped under one "Others" filter
+// option instead of cluttering the list with a checkbox per imprint.
+const MAIN_PUBLISHERS = [
+  "Marvel",
+  "DC Comics",
+  "Image",
+  "Dark Horse Comics",
+  "Boom! Studios",
+  "IDW Publishing",
+  "DMG/Valiant Entertainment",
+];
+const OTHERS_LABEL = "Others";
+
+function Filters({ publisherNames, seriesNames, pubs, setPubs, seriesSel, setSeriesSel, readOnly, setReadOnly, ownedOnly, setOwnedOnly, wishlistOnly, setWishlistOnly, favoritesOnly, setFavoritesOnly }: {
   publisherNames: string[];
   seriesNames: string[];
   pubs: string[]; setPubs: (v: string[]) => void;
@@ -43,6 +62,7 @@ function Filters({ publisherNames, seriesNames, pubs, setPubs, seriesSel, setSer
   readOnly: boolean; setReadOnly: (v: boolean) => void;
   ownedOnly: boolean; setOwnedOnly: (v: boolean) => void;
   wishlistOnly: boolean; setWishlistOnly: (v: boolean) => void;
+  favoritesOnly: boolean; setFavoritesOnly: (v: boolean) => void;
 }) {
   return (
     <div className="space-y-6 text-sm">
@@ -74,6 +94,10 @@ function Filters({ publisherNames, seriesNames, pubs, setPubs, seriesSel, setSer
           <label className="flex items-center gap-2"><Checkbox checked={ownedOnly} onCheckedChange={(v) => setOwnedOnly(!!v)} /> Owned</label>
           <label className="flex items-center gap-2"><Checkbox checked={readOnly} onCheckedChange={(v) => setReadOnly(!!v)} /> Read</label>
           <label className="flex items-center gap-2"><Checkbox checked={wishlistOnly} onCheckedChange={(v) => setWishlistOnly(!!v)} /> Wishlist</label>
+          <label className="flex items-center gap-2">
+            <Checkbox checked={favoritesOnly} onCheckedChange={(v) => setFavoritesOnly(!!v)} />
+            Favorites
+          </label>
         </div>
       </div>
     </div>
@@ -86,6 +110,7 @@ function Inventory() {
   const [ownedOnly, setOwnedOnly] = useState(false);
   const [readOnly, setReadOnly] = useState(false);
   const [wishlistOnly, setWishlistOnly] = useState(false);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<Sort>("recent");
   const [view, setView] = useState<"grid" | "list">("grid");
@@ -93,8 +118,16 @@ function Inventory() {
   const collection = useUserCollection();
   const publishers = usePublishers();
   const seriesList = useSeriesList();
+  const favSeries = useFavoriteSeries();
+  const favPublishers = useFavoritePublishers();
+  const favCreators = useFavoriteCreators();
 
-  const publisherNames = useMemo(() => (publishers.data ?? []).map((p) => p.name), [publishers.data]);
+  const publisherNames = useMemo(() => {
+    const allNames = (publishers.data ?? []).map((p) => p.name);
+    const mainPresent = MAIN_PUBLISHERS.filter((name) => allNames.includes(name));
+    const hasOthers = allNames.some((name) => !MAIN_PUBLISHERS.includes(name));
+    return hasOthers ? [...mainPresent, OTHERS_LABEL] : mainPresent;
+  }, [publishers.data]);
   const seriesNames = useMemo(() => (seriesList.data ?? []).map((s) => s.name), [seriesList.data]);
 
   const allComics = useMemo(
@@ -105,9 +138,36 @@ function Inventory() {
     [collection.data],
   );
 
+  const favoriteIds = useMemo(
+    () => ({
+      seriesIds: new Set((favSeries.data ?? []).map((s) => s.id)),
+      publisherIds: new Set((favPublishers.data ?? []).map((p) => p.id)),
+      creatorIds: new Set((favCreators.data ?? []).map((c) => c.id)),
+    }),
+    [favSeries.data, favPublishers.data, favCreators.data],
+  );
+
+  // Otherwise-inert favoriting (series/publisher/creator) finally does
+  // something: surfaces which owned/tracked comics actually belong to it.
+  const favoriteComicIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const entry of collection.data ?? []) {
+      if (entry.issue && isFavoriteIssue(entry.issue, favoriteIds)) {
+        ids.add(entry.issue.id);
+      }
+    }
+    return ids;
+  }, [collection.data, favoriteIds]);
+
   const filtered = useMemo(() => {
     let list = allComics.slice();
-    if (pubs.length) list = list.filter((c) => pubs.includes(c.publisher));
+    if (favoritesOnly) list = list.filter((c) => favoriteComicIds.has(c.id));
+    if (pubs.length) {
+      const othersSelected = pubs.includes(OTHERS_LABEL);
+      list = list.filter(
+        (c) => pubs.includes(c.publisher) || (othersSelected && !MAIN_PUBLISHERS.includes(c.publisher)),
+      );
+    }
     if (seriesSel.length) list = list.filter((c) => seriesSel.includes(c.series));
     if (ownedOnly) list = list.filter((c) => c.owned);
     if (readOnly) list = list.filter((c) => c.read);
@@ -123,9 +183,18 @@ function Inventory() {
       );
     }
     switch (sort) {
-      case "title":
       case "alpha":
-        list.sort((a, b) => a.title.localeCompare(b.title));
+        // Sort by series (with issue number as a tiebreak), not
+        // `comic.title` — the per-issue title (e.g. a ComicVine story
+        // title) that isn't even the text shown on these cards/rows
+        // (both display `{series} #{issue}`). Sorting by the invisible
+        // title field interleaved series alphabetically by issue-level
+        // text instead of by what's actually on screen.
+        list.sort((a, b) => {
+          const seriesCompare = a.series.localeCompare(b.series);
+          if (seriesCompare !== 0) return seriesCompare;
+          return String(a.issue).localeCompare(String(b.issue), undefined, { numeric: true });
+        });
         break;
       case "publisher":
         list.sort((a, b) => a.publisher.localeCompare(b.publisher));
@@ -138,9 +207,9 @@ function Inventory() {
         break;
     }
     return list;
-  }, [allComics, pubs, seriesSel, ownedOnly, readOnly, wishlistOnly, q, sort]);
+  }, [allComics, favoritesOnly, favoriteComicIds, pubs, seriesSel, ownedOnly, readOnly, wishlistOnly, q, sort]);
 
-  const filterProps = { publisherNames, seriesNames, pubs, setPubs, seriesSel, setSeriesSel, readOnly, setReadOnly, ownedOnly, setOwnedOnly, wishlistOnly, setWishlistOnly };
+  const filterProps = { publisherNames, seriesNames, pubs, setPubs, seriesSel, setSeriesSel, readOnly, setReadOnly, ownedOnly, setOwnedOnly, wishlistOnly, setWishlistOnly, favoritesOnly, setFavoritesOnly };
 
   return (
     <div>
@@ -168,7 +237,6 @@ function Inventory() {
               <SelectContent>
                 <SelectItem value="recent">Recently added</SelectItem>
                 <SelectItem value="release">Release date</SelectItem>
-                <SelectItem value="title">Title</SelectItem>
                 <SelectItem value="alpha">Alphabetical</SelectItem>
                 <SelectItem value="publisher">Publisher</SelectItem>
               </SelectContent>

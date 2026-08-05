@@ -20,6 +20,13 @@ const ISSUE_WITH_RELATIONS =
 // join doesn't drop anything a left join wouldn't already have included.
 const ISSUE_WITH_RELATIONS_SERIES_INNER =
   "*, volume:volumes!inner(*, series:series!inner(*, publisher:publishers(*))), issue_creators(role, creator:creators(*))" as const;
+// `!inner` on issue_creators/creator so the filter below actually restricts
+// which issues come back (same reasoning as the series-inner constant above)
+// — note the embedded issue_creators array in the result is still an
+// issue's *full* credit list, not just the row that matched; PostgREST
+// doesn't sub-filter embedded arrays, only which parent rows qualify.
+const ISSUE_WITH_RELATIONS_CREATOR_INNER =
+  "*, volume:volumes(*, series:series(*, publisher:publishers(*))), issue_creators!inner(role, creator:creators!inner(*))" as const;
 // `runs` has no direct FK to `series` — a run relates to volumes/issues only
 // indirectly through `run_items`. Don't join a relationship that doesn't
 // exist in the schema.
@@ -58,10 +65,25 @@ export async function searchAll(
   if (!q) return empty;
 
   const like = `%${q}%`;
+  // For "click a credit name" (always a full "First Last" string) as well as
+  // typed multi-word searches — a single ilike against one column can never
+  // match a two-word name (neither first_name nor last_name contains the
+  // whole "First Last" string). Splitting on the last word and requiring
+  // both halves to match *the same* creator row (chained ilike, not `.or`)
+  // is what actually finds them precisely — confirmed live: `.or()` can't
+  // reach into a doubly-nested embedded resource at all (PGRST100), and
+  // matching first/last independently via two separate queries produces
+  // cross-credit false positives (e.g. issue has a "Bill" colorist and an
+  // unrelated "Finger" letterer) that a same-row AND doesn't.
+  const words = q.split(/\s+/).filter(Boolean);
+  const lastWord = words[words.length - 1];
+  const firstWords = words.slice(0, -1).join(" ");
 
   const [
     issuesByFieldRes,
     issuesBySeriesRes,
+    issuesByCreatorRes,
+    issuesByFullNameRes,
     seriesRes,
     runsRes,
     volumesRes,
@@ -84,6 +106,25 @@ export async function searchAll(
       .select(ISSUE_WITH_RELATIONS_SERIES_INNER)
       .ilike("volume.series.name", like)
       .limit(limit),
+    // Single-word queries (a bare first or last name, e.g. typing
+    // "Claremont") — matches either column against the whole query.
+    supabase
+      .from("issues")
+      .select(ISSUE_WITH_RELATIONS_CREATOR_INNER)
+      .or(`first_name.ilike.${like},last_name.ilike.${like}`, {
+        foreignTable: "issue_creators.creator",
+      })
+      .limit(limit),
+    // Multi-word queries (a full "First Last" credit) — only runs when
+    // there's a last word to split off.
+    words.length >= 2
+      ? supabase
+          .from("issues")
+          .select(ISSUE_WITH_RELATIONS_CREATOR_INNER)
+          .ilike("issue_creators.creator.first_name", `%${firstWords}%`)
+          .ilike("issue_creators.creator.last_name", `%${lastWord}%`)
+          .limit(limit)
+      : Promise.resolve({ data: [], error: null }),
     supabase
       .from("series")
       .select(SERIES_WITH_PUBLISHER)
@@ -105,8 +146,10 @@ export async function searchAll(
 
   const issuesByField = unwrap(issuesByFieldRes, "Failed to search issues") as IssueWithRelations[];
   const issuesBySeries = unwrap(issuesBySeriesRes, "Failed to search issues by series") as IssueWithRelations[];
+  const issuesByCreator = unwrap(issuesByCreatorRes, "Failed to search issues by creator") as IssueWithRelations[];
+  const issuesByFullName = unwrap(issuesByFullNameRes, "Failed to search issues by creator") as IssueWithRelations[];
   const issuesById = new Map<string, IssueWithRelations>();
-  for (const issue of [...issuesByField, ...issuesBySeries]) {
+  for (const issue of [...issuesByField, ...issuesBySeries, ...issuesByCreator, ...issuesByFullName]) {
     issuesById.set(issue.id, issue);
   }
 

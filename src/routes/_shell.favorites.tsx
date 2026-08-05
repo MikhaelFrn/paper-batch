@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useMemo } from "react";
 import { Heart } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,12 +12,13 @@ import {
 } from "@/hooks/useFavorites";
 import { useUserCollection } from "@/hooks/useUserComics";
 import { userComicToComic } from "@/lib/comic-adapters";
+import { isFavoriteIssue } from "@/lib/favorite-match";
 
 export const Route = createFileRoute("/_shell/favorites")({
   head: () => ({
     meta: [
       { title: "Favorites · Comic Vault" },
-      { name: "description", content: "Your favorite series, publishers, writers, and artists." },
+      { name: "description", content: "Your favorite series, publishers, and creators." },
       { property: "og:title", content: "My favorites — Comic Vault" },
       { property: "og:description", content: "The creators and stories you love most." },
     ],
@@ -30,24 +32,32 @@ function Favorites() {
   const favCreators = useFavoriteCreators();
   const collection = useUserCollection();
 
+  const favoriteIds = useMemo(
+    () => ({
+      seriesIds: new Set((favSeries.data ?? []).map((s) => s.id)),
+      publisherIds: new Set((favPublishers.data ?? []).map((p) => p.id)),
+      creatorIds: new Set((favCreators.data ?? []).map((c) => c.id)),
+    }),
+    [favSeries.data, favPublishers.data, favCreators.data],
+  );
+
+  // What favoriting a series/publisher/creator actually *does*: surfaces
+  // which of your tracked comics belong to one. Previously this tab showed
+  // comics rated 4+ stars — a rating, not a favorite, and disconnected
+  // from every other tab on this page.
   const favComics = (collection.data ?? [])
-    .filter((e) => (e.rating ?? 0) >= 4)
+    .filter((e) => e.issue && isFavoriteIssue(e.issue, favoriteIds))
     .map((e) => userComicToComic(e))
     .filter((c): c is NonNullable<typeof c> => !!c);
 
-  const writers = (favCreators.data ?? []).filter((c) => (c.api_source ?? "").includes("writer") || true);
-  // The creator role isn't stored on the creator row itself, so show all favorite creators in one list.
-  const artists = writers;
-
   return (
     <div>
-      <PageHeader eyebrow="Your taste" title="Favorites" description="Series, publishers, writers, artists, and issues you've starred." />
+      <PageHeader eyebrow="Your taste" title="Favorites" description="Series, publishers, creators, and the comics that match them." />
       <Tabs defaultValue="series">
         <TabsList>
           <TabsTrigger value="series">Series</TabsTrigger>
           <TabsTrigger value="publishers">Publishers</TabsTrigger>
-          <TabsTrigger value="writers">Writers</TabsTrigger>
-          <TabsTrigger value="artists">Artists</TabsTrigger>
+          <TabsTrigger value="creators">Creators</TabsTrigger>
           <TabsTrigger value="comics">Comics</TabsTrigger>
         </TabsList>
 
@@ -74,23 +84,18 @@ function Favorites() {
           </div>
         </TabsContent>
 
-        <TabsContent value="writers" className="mt-6">
+        <TabsContent value="creators" className="mt-6">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {writers.map((w) => (
-              <Card key={w.id} className="border-border/60"><CardContent className="p-4">{[w.first_name, w.last_name].filter(Boolean).join(" ")}</CardContent></Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="artists" className="mt-6">
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {artists.map((a) => (
-              <Card key={a.id} className="border-border/60"><CardContent className="p-4">{[a.first_name, a.last_name].filter(Boolean).join(" ")}</CardContent></Card>
+            {(favCreators.data ?? []).map((c) => (
+              <Card key={c.id} className="border-border/60"><CardContent className="p-4">{[c.first_name, c.last_name].filter(Boolean).join(" ")}</CardContent></Card>
             ))}
           </div>
         </TabsContent>
 
         <TabsContent value="comics" className="mt-6">
+          <p className="mb-4 text-sm text-muted-foreground">
+            Comics from a favorite series or publisher, or with a favorite creator credited on them.
+          </p>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
             {favComics.map((c) => <ComicCard key={c.id} comic={c} />)}
           </div>

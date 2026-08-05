@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Camera } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PublisherBadge } from "@/components/comic-card";
-import { useMyProfile, useUpdateMyProfile } from "@/hooks/useProfiles";
+import { AvatarCropDialog } from "@/components/avatar-crop-dialog";
+import { useMyProfile, useUpdateMyProfile, useUploadMyAvatar } from "@/hooks/useProfiles";
 import { useUserCollection } from "@/hooks/useUserComics";
 import {
   useFavoriteSeries,
@@ -17,7 +18,7 @@ import {
 import { useMyLists, useList } from "@/hooks/useLists";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getCurrentUser, updateAuthUser } from "@/services/auth";
 
 export const Route = createFileRoute("/_shell/profile")({
@@ -54,6 +55,8 @@ function Profile() {
   const profile = useMyProfile();
   const navigate = useNavigate();
   const update = useUpdateMyProfile();
+  const uploadAvatar = useUploadMyAvatar();
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const collection = useUserCollection();
   const favSeries = useFavoriteSeries();
   const favPublishers = useFavoritePublishers();
@@ -64,6 +67,7 @@ function Profile() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
   const handleCancel = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     e.preventDefault();
     navigate({ to: "/profile" });
@@ -83,6 +87,19 @@ function Profile() {
         } catch (error) {
           toast.error("Invalid info provided.");
         }
+  }
+  const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file next time
+    if (!file) return;
+    setPendingAvatarFile(file);
+  }
+  const handleAvatarCropped = (blob: Blob) => {
+    setPendingAvatarFile(null);
+    uploadAvatar.mutate(blob, {
+      onSuccess: () => toast.success("Profile picture updated!"),
+      onError: (error) => toast.error(error instanceof Error ? error.message : "Couldn't upload that image."),
+    });
   }
 
   const entries = collection.data ?? [];
@@ -121,9 +138,25 @@ function Profile() {
           <CardContent className="flex flex-col items-center p-6 text-center">
             <div className="relative">
               <Avatar className="h-24 w-24 ring-2 ring-primary/50">
+                <AvatarImage src={profile.data?.avatar_url ?? ""} alt={displayName || username} />
                 <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-2xl font-bold text-white">{initials(displayName || username || "?")}</AvatarFallback>
               </Avatar>
-              <Button size="icon" className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full"><Camera className="h-4 w-4" /></Button>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={handleAvatarFile}
+              />
+              <Button
+                size="icon"
+                type="button"
+                disabled={uploadAvatar.isPending}
+                className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full"
+                onClick={() => avatarInputRef.current?.click()}
+              >
+                <Camera className="h-4 w-4" />
+              </Button>
             </div>
             <div className="mt-4 font-display text-xl tracking-wide">{displayName || "—"}</div>
             <div className="text-xs text-muted-foreground">@{username || "—"}</div>
@@ -192,6 +225,12 @@ function Profile() {
           </Card>
         </div>
       </div>
+
+      <AvatarCropDialog
+        file={pendingAvatarFile}
+        onCancel={() => setPendingAvatarFile(null)}
+        onCropped={handleAvatarCropped}
+      />
     </div>
   );
 }

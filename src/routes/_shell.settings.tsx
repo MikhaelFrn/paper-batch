@@ -1,10 +1,22 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useDeleteMyAccount } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_shell/settings")({
@@ -21,6 +33,15 @@ export const Route = createFileRoute("/_shell/settings")({
 
 function Settings() {
   const [theme, setTheme] = useState("dark");
+  const navigate = useNavigate();
+  const deleteAccount = useDeleteMyAccount();
+
+  const handleDeleteAccount = () => {
+    deleteAccount.mutate(undefined, {
+      onSuccess: () => navigate({ to: "/goodbye" }),
+      onError: () => toast.error("Couldn't delete your account. Try again in a moment."),
+    });
+  };
 
   return (
     <div>
@@ -54,7 +75,29 @@ function Settings() {
           <CardHeader><CardTitle className="text-destructive">Danger zone</CardTitle></CardHeader>
           <CardContent className="flex items-center justify-between gap-4">
             <div className="text-sm text-muted-foreground">Delete your account and all collection data. This cannot be undone.</div>
-            <Button variant="destructive">Delete account</Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive">Delete account</Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This is irreversible and you will need to create another account to continue using Comic Vault.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteAccount}
+                    disabled={deleteAccount.isPending}
+                    className={buttonVariants({ variant: "destructive" })}
+                  >
+                    {deleteAccount.isPending ? "Deleting…" : "Delete account"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </CardContent>
         </Card>
       </div>

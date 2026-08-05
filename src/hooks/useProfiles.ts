@@ -7,6 +7,7 @@ import {
   updateMyProfile,
   upsertMyProfile,
 } from "@/services/profiles";
+import { uploadMyAvatar } from "@/services/avatars";
 import { queryKeys } from "./queryKeys";
 
 export function useSearchProfiles(query: string) {
@@ -37,6 +38,20 @@ export function useUpdateMyProfile() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (patch: ProfileUpdate) => updateMyProfile(patch),
+    onSuccess: (profile) => {
+      qc.invalidateQueries({ queryKey: queryKeys.profiles.me() });
+      qc.invalidateQueries({ queryKey: queryKeys.profiles.detail(profile.id) });
+    },
+  });
+}
+
+export function useUploadMyAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: Blob) => {
+      const avatarUrl = await uploadMyAvatar(file);
+      return updateMyProfile({ avatar_url: avatarUrl });
+    },
     onSuccess: (profile) => {
       qc.invalidateQueries({ queryKey: queryKeys.profiles.me() });
       qc.invalidateQueries({ queryKey: queryKeys.profiles.detail(profile.id) });

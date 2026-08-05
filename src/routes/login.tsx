@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useState } from "react";
-import { useSignIn } from "@/hooks/useAuth";
+import { useSignIn, useSignInWithGoogle } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
@@ -29,6 +29,12 @@ function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const login = useSignIn();
+  const signInWithGoogle = useSignInWithGoogle();
+  const handleGoogleSignIn = () => {
+    signInWithGoogle.mutate(undefined, {
+      onError: () => toast.error("Couldn't start Google sign-in."),
+    });
+  };
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -62,7 +68,15 @@ function Login() {
         </div>
         <label className="flex items-center gap-2 text-sm"><Checkbox defaultChecked /> Keep me signed in</label>
         <Button type="submit" className="w-full" disabled={login.isPending} onChange={(e) => setPassword(e.target.value)}>{login.isPending ? "Signing in..." : "Sign in"}</Button>
-        <Button type="button" variant="outline" className="w-full">Continue with Google</Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          disabled={signInWithGoogle.isPending}
+          onClick={handleGoogleSignIn}
+        >
+          {signInWithGoogle.isPending ? "Redirecting…" : "Continue with Google"}
+        </Button>
       </form>
     </AuthShell>
   );
