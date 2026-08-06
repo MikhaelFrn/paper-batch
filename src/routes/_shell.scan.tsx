@@ -38,7 +38,7 @@ const MODES: ScanMode[] = [
     to: "/scan/barcode",
     icon: Barcode,
     title: "Barcode",
-    description: "Camera or a photo of the UPC/EAN on the back cover. Best for collected editions and TPBs.",
+    description: "Camera or a photo of the UPC/EAN (the barcode) on the back cover. Best for collected editions and TPBs.",
   },
   {
     to: "/scan/cover",

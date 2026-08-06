@@ -97,6 +97,14 @@
   --gradient-boom: linear-gradient(135deg, #f59e0b, #78350f);
   --gradient-idw: linear-gradient(135deg, #ef4444, #1e293b);
   --gradient-valiant: linear-gradient(135deg, #8b5cf6, #1e1b4b);
+  /* List-card banners (Lists page): owned lists get a neutral gradient,
+     shared ones get orange (editor) / purple (viewer) so they read as
+     "not yours" at a glance. Overridden in .light below — badges layered
+     on top use an opaque black pill regardless of theme, so lightening
+     these for light mode doesn't touch text contrast. */
+  --gradient-list-owner: linear-gradient(135deg, oklch(0.35 0.05 260), oklch(0.20 0.05 260));
+  --gradient-list-editor: linear-gradient(135deg, oklch(0.45 0.12 55), oklch(0.28 0.12 45));
+  --gradient-list-viewer: linear-gradient(135deg, oklch(0.42 0.12 300), oklch(0.26 0.12 305));
   --shadow-cover: 0 20px 40px -20px rgb(0 0 0 / 0.7), 0 2px 6px rgb(0 0 0 / 0.4);
   --shadow-glow-marvel: 0 0 40px oklch(0.62 0.24 27 / 0.35);
   --shadow-glow-dc: 0 0 40px oklch(0.55 0.22 258 / 0.35);
@@ -124,6 +132,16 @@
   --sidebar-accent: oklch(0.92 0.008 260);
   --sidebar-accent-foreground: oklch(0.15 0.02 265);
   --sidebar-border: oklch(0.90 0.008 260);
+
+  /* Same hues as :root, fading up toward a pale tint instead of down
+     toward near-black — a dark-fading gradient reads as a moody accent
+     against this app's dark background, but as a jarring dark smudge
+     against a light one. Chroma tapers down toward the light end too,
+     since a very light + very saturated oklch color tends to clip out of
+     the sRGB gamut and render oddly. */
+  --gradient-list-owner: linear-gradient(135deg, oklch(0.55 0.04 260), oklch(0.82 0.025 260));
+  --gradient-list-editor: linear-gradient(135deg, oklch(0.65 0.15 55), oklch(0.88 0.08 50));
+  --gradient-list-viewer: linear-gradient(135deg, oklch(0.62 0.15 300), oklch(0.87 0.08 302));
 }
 
 @layer base {

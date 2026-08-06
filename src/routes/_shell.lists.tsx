@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMyLists, useCreateList } from "@/hooks/useLists";
-import { getPublisherAccent } from "@/lib/comic-adapters";
 import type { ListType, ListVisibility } from "@/lib/types";
 import {
   Dialog,
@@ -62,13 +61,12 @@ const ROLE_LABEL: Record<"editor" | "viewer", string> = {
 // A shared list's banner is recolored by role so it reads at a glance
 // during a grid-scan, not just via the small text badge in the corner —
 // that's the whole point ("make lists that aren't yours more obvious").
-// Same recipe as the default gradient (135deg, two oklch stops, matching
-// lightness range) with a punchier chroma than that gradient's muted 0.05,
-// since these need to actually stand out, not just tint. Owned lists keep
-// the existing default gradient untouched.
+// CSS vars (styles.css), not inline oklch, so light mode gets its own
+// fading-toward-pale variant instead of inheriting the dark theme's
+// fading-toward-black one.
 const ROLE_GRADIENT: Record<"editor" | "viewer", string> = {
-  editor: "linear-gradient(135deg, oklch(0.45 0.12 55), oklch(0.28 0.12 45))",
-  viewer: "linear-gradient(135deg, oklch(0.42 0.12 300), oklch(0.26 0.12 305))",
+  editor: "var(--gradient-list-editor)",
+  viewer: "var(--gradient-list-viewer)",
 };
 
 function NewListDialog() {
@@ -183,7 +181,7 @@ function Lists() {
             const bannerGradient =
               list.myRole === "editor" || list.myRole === "viewer"
                 ? ROLE_GRADIENT[list.myRole]
-                : getPublisherAccent(null);
+                : "var(--gradient-list-owner)";
             return (
               <Link key={list.id} to="/lists/$id" params={{ id: list.id }}>
                 <Card className="group cursor-pointer overflow-hidden border-border/60 transition hover:border-primary/40">
