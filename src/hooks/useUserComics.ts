@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UserCollectionEntry, UserComic } from "@/lib/types";
 import {
   bulkSetOwned,
+  bulkSetRead,
   deleteMyUserComic,
   getMyUserComicByIssue,
   listMyCollection,
@@ -43,6 +44,20 @@ export function useBulkSetOwned() {
   return useMutation({
     mutationFn: ({ issueIds, owned }: { issueIds: string[]; owned: boolean }) =>
       bulkSetOwned(issueIds, owned),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.userComics.collection() });
+      for (const issueId of vars.issueIds) {
+        qc.invalidateQueries({ queryKey: queryKeys.userComics.byIssue(issueId) });
+      }
+    },
+  });
+}
+
+export function useBulkSetRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ issueIds, read }: { issueIds: string[]; read: boolean }) =>
+      bulkSetRead(issueIds, read),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.userComics.collection() });
       for (const issueId of vars.issueIds) {

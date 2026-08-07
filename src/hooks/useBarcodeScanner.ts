@@ -92,6 +92,17 @@ export function useBarcodeScanner(active: boolean, onDetect: (code: string) => v
 
     const run = async () => {
       try {
+        // navigator.mediaDevices only exists in a secure context (https://,
+        // or localhost) — on plain http:// (e.g. testing over a LAN IP from
+        // a phone) it's undefined, and calling .getUserMedia on it throws a
+        // generic "Cannot read properties of undefined" with no indication
+        // why. Catching that specific case up front gives a message that
+        // actually explains it instead of raw JS internals.
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error(
+            "Camera access needs a secure connection (https://) — this works once the site is properly hosted, but not over a plain network address.",
+          );
+        }
         stream = await navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
         if (cancelled || !videoRef.current) {
           stream.getTracks().forEach((track) => track.stop());

@@ -166,10 +166,15 @@ function Dashboard() {
             <CardHeader><CardTitle className="text-sm uppercase tracking-widest text-muted-foreground">Favorite series</CardTitle></CardHeader>
             <CardContent className="space-y-2">
               {(favSeries.data ?? []).map((s) => (
-                <div key={s.id} className="flex items-center justify-between text-sm">
+                <Link
+                  key={s.id}
+                  to="/search"
+                  search={{ q: s.name }}
+                  className="flex items-center justify-between text-sm hover:text-primary"
+                >
                   <span className="truncate">{s.name}</span>
                   <TrendingUp className="h-3.5 w-3.5 text-primary" />
-                </div>
+                </Link>
               ))}
             </CardContent>
           </Card>

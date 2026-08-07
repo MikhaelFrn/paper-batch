@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CheckCheck, ListChecks, Sparkles, X } from "lucide-react";
+import { BookOpen, CheckCheck, ListChecks, ListPlus, Sparkles, X } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { ComicCard } from "@/components/comic-card";
 import { Button } from "@/components/ui/button";
@@ -9,10 +9,17 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useVolume } from "@/hooks/useVolumes";
 import { useIssuesByVolume } from "@/hooks/useIssues";
 import { useRunsForVolume, useAnalyzeVolume } from "@/hooks/useRuns";
-import { useBulkSetOwned, useUserCollection } from "@/hooks/useUserComics";
+import { useBulkSetOwned, useBulkSetRead, useUserCollection } from "@/hooks/useUserComics";
+import { useBulkAddIssuesToList, useMyLists } from "@/hooks/useLists";
 import { issueToComic } from "@/lib/comic-adapters";
 
 export const Route = createFileRoute("/_shell/volumes/$id")({
@@ -93,24 +100,86 @@ function AnalyzeButton({
   );
 }
 
+/** Same "add to list" dropdown as the comic detail page's AddToListMenu,
+ * just bulk — lets a selection go straight to e.g. a wishlist without
+ * also being marked owned or read (the actual point: #2-9 of something
+ * you're missing shouldn't get flagged as owned just because you selected
+ * them). Viewer-role lists are excluded, same reasoning as the single-issue
+ * version — collaborators there can see but not add. */
+function BulkAddToListMenu({
+  issueIds,
+  onAdded,
+}: {
+  issueIds: string[];
+  onAdded: () => void;
+}) {
+  const lists = useMyLists();
+  const bulkAddToList = useBulkAddIssuesToList();
+  const addableLists = (lists.data ?? []).filter((l) => l.myRole !== "viewer");
+
+  const handleAdd = (listId: string, listName: string) => {
+    bulkAddToList.mutate(
+      { listId, issueIds },
+      {
+        onSuccess: () => {
+          toast.success(`Added ${issueIds.length} issue${issueIds.length === 1 ? "" : "s"} to ${listName}`);
+          onAdded();
+        },
+        onError: () => toast.error(`Couldn't add to ${listName}`),
+      },
+    );
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" disabled={issueIds.length === 0 || bulkAddToList.isPending}>
+          <ListPlus className="h-4 w-4" />Add to list
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
+        {addableLists.length === 0 ? (
+          <DropdownMenuItem disabled>No lists yet</DropdownMenuItem>
+        ) : (
+          addableLists.map((l) => (
+            <DropdownMenuItem key={l.id} onClick={() => handleAdd(l.id, l.name)}>
+              {l.name}
+            </DropdownMenuItem>
+          ))
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 /** Controlled selection toolbar — "select a range" reads off issues.sort_number
  * (a numeric column populated on import) rather than the display issue
  * string, since issue numbers like "1AU" or "0.1" don't parse as a clean
- * range boundary but do sort correctly via that column. */
-function BulkOwnedToolbar({
+ * range boundary but do sort correctly via that column. Owned/read/list
+ * are independent actions, not a single "add these to my collection" combo
+ * — e.g. filling a gap in a run belongs on a wishlist, not owned or read. */
+function BulkActionsToolbar({
   selectedCount,
+  selectedIds,
   onSelectAll,
   onSelectRange,
   onClear,
   onMarkOwned,
-  isPending,
+  onMarkRead,
+  onListAdded,
+  isMarkingOwned,
+  isMarkingRead,
 }: {
   selectedCount: number;
+  selectedIds: string[];
   onSelectAll: () => void;
   onSelectRange: (from: string, to: string) => void;
   onClear: () => void;
   onMarkOwned: () => void;
-  isPending: boolean;
+  onMarkRead: () => void;
+  onListAdded: () => void;
+  isMarkingOwned: boolean;
+  isMarkingRead: boolean;
 }) {
   const [rangeFrom, setRangeFrom] = useState("");
   const [rangeTo, setRangeTo] = useState("");
@@ -126,10 +195,17 @@ function BulkOwnedToolbar({
         <Button variant="outline" size="sm" onClick={() => onSelectRange(rangeFrom, rangeTo)}>Select range</Button>
       </div>
       <Button variant="ghost" size="sm" onClick={onClear} disabled={selectedCount === 0}>Clear</Button>
-      <Button size="sm" className="ml-auto" onClick={onMarkOwned} disabled={selectedCount === 0 || isPending}>
-        <CheckCheck className="h-4 w-4" />
-        {isPending ? "Marking…" : `Mark ${selectedCount} as owned`}
-      </Button>
+      <div className="ml-auto flex flex-wrap items-center gap-2">
+        <BulkAddToListMenu issueIds={selectedIds} onAdded={onListAdded} />
+        <Button variant="outline" size="sm" onClick={onMarkRead} disabled={selectedCount === 0 || isMarkingRead}>
+          <BookOpen className="h-4 w-4" />
+          {isMarkingRead ? "Marking…" : `Mark ${selectedCount} as read`}
+        </Button>
+        <Button size="sm" onClick={onMarkOwned} disabled={selectedCount === 0 || isMarkingOwned}>
+          <CheckCheck className="h-4 w-4" />
+          {isMarkingOwned ? "Marking…" : `Mark ${selectedCount} as owned`}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -144,6 +220,7 @@ function VolumeDetail() {
   const runs = useRunsForVolume(isCvOnly ? undefined : id);
   const collection = useUserCollection();
   const bulkSetOwned = useBulkSetOwned();
+  const bulkSetRead = useBulkSetRead();
 
   const [selectionMode, setSelectionMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -225,6 +302,26 @@ function VolumeDetail() {
     );
   };
 
+  const handleMarkRead = () => {
+    const issueIds = [...selected];
+    bulkSetRead.mutate(
+      { issueIds, read: true },
+      {
+        onSuccess: () => {
+          toast.success(`Marked ${issueIds.length} issue${issueIds.length === 1 ? "" : "s"} as read.`);
+          setSelected(new Set());
+          setSelectionMode(false);
+        },
+        onError: () => toast.error("Couldn't update read status."),
+      },
+    );
+  };
+
+  const handleListAdded = () => {
+    setSelected(new Set());
+    setSelectionMode(false);
+  };
+
   return (
     <div>
       <PageHeader
@@ -295,13 +392,17 @@ function VolumeDetail() {
         </div>
 
         {selectionMode && (
-          <BulkOwnedToolbar
+          <BulkActionsToolbar
             selectedCount={selected.size}
+            selectedIds={[...selected]}
             onSelectAll={handleSelectAll}
             onSelectRange={handleSelectRange}
             onClear={() => setSelected(new Set())}
             onMarkOwned={handleMarkOwned}
-            isPending={bulkSetOwned.isPending}
+            onMarkRead={handleMarkRead}
+            onListAdded={handleListAdded}
+            isMarkingOwned={bulkSetOwned.isPending}
+            isMarkingRead={bulkSetRead.isPending}
           />
         )}
 

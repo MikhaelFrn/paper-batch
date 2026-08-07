@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { Heart } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
@@ -64,12 +64,14 @@ function Favorites() {
         <TabsContent value="series" className="mt-6">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {(favSeries.data ?? []).map((s) => (
-              <Card key={s.id} className="border-border/60">
-                <CardHeader className="flex-row items-center gap-3">
-                  <Heart className="h-5 w-5 fill-primary text-primary" />
-                  <CardTitle className="font-display text-lg tracking-wide">{s.name}</CardTitle>
-                </CardHeader>
-              </Card>
+              <Link key={s.id} to="/search" search={{ q: s.name }}>
+                <Card className="cursor-pointer border-border/60 transition hover:border-primary/40">
+                  <CardHeader className="flex-row items-center gap-3">
+                    <Heart className="h-5 w-5 fill-primary text-primary" />
+                    <CardTitle className="font-display text-lg tracking-wide">{s.name}</CardTitle>
+                  </CardHeader>
+                </Card>
+              </Link>
             ))}
           </div>
         </TabsContent>

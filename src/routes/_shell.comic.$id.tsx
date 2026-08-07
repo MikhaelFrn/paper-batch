@@ -35,13 +35,17 @@ import {
 } from "@/hooks/useLists";
 import { useRunsForIssue } from "@/hooks/useRuns";
 import {
+  useFavoriteCreators,
   useFavoritePublishers,
   useFavoriteSeries,
+  useToggleFavoriteCreator,
   useToggleFavoritePublisher,
   useToggleFavoriteSeries,
 } from "@/hooks/useFavorites";
 import { issueToComic, normalizeSeriesName } from "@/lib/comic-adapters";
 import type { Comic } from "@/lib/comic-adapters";
+import type { IssueWithRelations } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_shell/comic/$id")({
   head: () => ({
@@ -64,25 +68,78 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+interface CreatorRef {
+  id: string;
+  name: string;
+}
+
+/** Extracts {id, name} pairs (not just display strings, unlike
+ * comic-adapters.ts's pickCreators) for a given credit role — favoriting
+ * needs the real creator id, which the flattened Comic type doesn't
+ * carry. Role predicates mirror pickCreators exactly so "Writer(s)" here
+ * means the same thing it means everywhere else. */
+function pickCreatorRefs(
+  issueCreators: IssueWithRelations["issue_creators"],
+  matcher: (role: string) => boolean,
+): CreatorRef[] {
+  const byId = new Map<string, CreatorRef>();
+  for (const ic of issueCreators) {
+    if (!ic.creator || !matcher((ic.role ?? "").toLowerCase())) continue;
+    const name = [ic.creator.first_name, ic.creator.last_name].filter(Boolean).join(" ").trim() || "Unknown";
+    byId.set(ic.creator.id, { id: ic.creator.id, name });
+  }
+  return [...byId.values()];
+}
+
 /** Credit names as links into global search, so "who else did this run" is
  * one click away instead of a manual retype — the search box ends up with
- * exactly the name you clicked, same as typing it yourself. `pickCreators`
- * (comic-adapters.ts) falls back to a "—" placeholder for an empty writer
- * list; that's display-only text, not a real name, so it stays unlinked. */
-function CreatorLinks({ names, className }: { names: string[]; className?: string }) {
-  if (names.length === 0 || (names.length === 1 && names[0] === "—")) {
-    return <>—</>;
-  }
+ * exactly the name you clicked, same as typing it yourself.
+ *
+ * `showFavorite` adds a per-creator favorite toggle — Credits card only,
+ * not the hero byline (too dense a line to also carry an icon per name).
+ * This is a deliberate per-click favorite, not derived from ownership:
+ * owning a comic a creator worked on doesn't mean you liked their part in
+ * it, so favoriting is never inferred from the collection. */
+function CreatorLinks({
+  creators,
+  favoriteIds,
+  onToggleFavorite,
+  showFavorite = false,
+  className,
+}: {
+  creators: CreatorRef[];
+  favoriteIds?: Set<string>;
+  onToggleFavorite?: (creator: CreatorRef, isFavorite: boolean) => void;
+  showFavorite?: boolean;
+  className?: string;
+}) {
+  if (creators.length === 0) return <>—</>;
   return (
     <>
-      {names.map((name, i) => (
-        <span key={name}>
-          {i > 0 && ", "}
-          <Link to="/search" search={{ q: name }} className={className ?? "hover:underline"}>
-            {name}
-          </Link>
-        </span>
-      ))}
+      {creators.map((creator, i) => {
+        const isFavorite = !!favoriteIds?.has(creator.id);
+        return (
+          <span key={creator.id} className="inline-flex items-center">
+            {i > 0 && <span className="mr-1">,</span>}
+            <Link to="/search" search={{ q: creator.name }} className={className ?? "hover:underline"}>
+              {creator.name}
+            </Link>
+            {showFavorite && (
+              <button
+                type="button"
+                onClick={() => onToggleFavorite?.(creator, isFavorite)}
+                aria-label={isFavorite ? `Remove ${creator.name} from favorite creators` : `Favorite ${creator.name}`}
+                className={cn(
+                  "ml-1 transition-colors",
+                  isFavorite ? "text-primary" : "text-muted-foreground/40 hover:text-primary",
+                )}
+              >
+                <Heart className={cn("h-3 w-3", isFavorite && "fill-current")} />
+              </button>
+            )}
+          </span>
+        );
+      })}
     </>
   );
 }
@@ -147,11 +204,13 @@ function ComicDetail() {
   const isWishlistedQ = useIsIssueInList(wishlistList?.id, id);
   const favSeries = useFavoriteSeries();
   const favPublishers = useFavoritePublishers();
+  const favCreators = useFavoriteCreators();
   const addToWishlist = useAddIssueToDefaultList();
   const removeFromList = useRemoveIssueFromList();
   const upsertUserComic = useUpsertMyUserComic();
   const toggleFavSeries = useToggleFavoriteSeries();
   const toggleFavPublisher = useToggleFavoritePublisher();
+  const toggleFavCreator = useToggleFavoriteCreator();
   const [similarOwned, setSimilarOwned] = useState<Comic | null>(null);
 
   if (issueQ.isLoading) {
@@ -191,6 +250,19 @@ function ComicDetail() {
   const isFavSeries = !!seriesId && (favSeries.data ?? []).some((s) => s.id === seriesId);
   const isFavPublisher = !!publisherId && (favPublishers.data ?? []).some((p) => p.id === publisherId);
   const isWishlisted = !!isWishlistedQ.data;
+
+  const favCreatorIds = new Set((favCreators.data ?? []).map((c) => c.id));
+  const writerRefs = pickCreatorRefs(issueQ.data.issue_creators, (r) => r.includes("writer"));
+  const artistRefs = pickCreatorRefs(
+    issueQ.data.issue_creators,
+    (r) =>
+      r.includes("artist") ||
+      r.includes("penciler") ||
+      r.includes("penciller") ||
+      r.includes("inker") ||
+      r.includes("colorist"),
+  );
+  const coverArtistRefs = pickCreatorRefs(issueQ.data.issue_creators, (r) => r.includes("cover"));
 
   const handleWishlist = () => {
     if (isWishlisted && wishlistList) {
@@ -286,6 +358,16 @@ function ComicDetail() {
     );
   };
 
+  const handleToggleFavCreator = (creator: CreatorRef, isFavorite: boolean) => {
+    toggleFavCreator.mutate(
+      { creatorId: creator.id, isFavorite },
+      {
+        onSuccess: () => toast.success(isFavorite ? `${creator.name} unfavorited` : `${creator.name} favorited`),
+        onError: () => toast.error("Couldn't update favorites"),
+      },
+    );
+  };
+
   return (
     <div className="-mx-4 sm:-mx-6 lg:-mx-8">
       {/* Hero */}
@@ -303,9 +385,9 @@ function ComicDetail() {
             <div className="text-xs uppercase tracking-widest text-white/80">{comic.series}</div>
             <h1 className="font-display mt-1 text-4xl leading-tight tracking-wide sm:text-5xl">{comic.title}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-white/85">
-              <span>By <CreatorLinks names={comic.writers} /></span>
+              <span>By <CreatorLinks creators={writerRefs} /></span>
               <span>·</span>
-              <span>Art <CreatorLinks names={comic.artists} /></span>
+              <span>Art <CreatorLinks creators={artistRefs} /></span>
               <span>·</span>
               <span>{new Date(comic.releaseDate).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}</span>
               {comic.rating && <><span>·</span><RatingStars value={comic.rating} /></>}
@@ -360,17 +442,36 @@ function ComicDetail() {
               <Field label="Released" value={new Date(comic.releaseDate).toLocaleDateString()} />
               <Field
                 label="Writer(s)"
-                value={<CreatorLinks names={comic.writers} className="text-primary hover:underline" />}
+                value={
+                  <CreatorLinks
+                    creators={writerRefs}
+                    favoriteIds={favCreatorIds}
+                    onToggleFavorite={handleToggleFavCreator}
+                    showFavorite
+                    className="text-primary hover:underline"
+                  />
+                }
               />
               <Field
                 label="Artist(s)"
-                value={<CreatorLinks names={comic.artists} className="text-primary hover:underline" />}
+                value={
+                  <CreatorLinks
+                    creators={artistRefs}
+                    favoriteIds={favCreatorIds}
+                    onToggleFavorite={handleToggleFavCreator}
+                    showFavorite
+                    className="text-primary hover:underline"
+                  />
+                }
               />
               <Field
                 label="Cover"
                 value={
                   <CreatorLinks
-                    names={comic.coverArtist ? [comic.coverArtist] : []}
+                    creators={coverArtistRefs}
+                    favoriteIds={favCreatorIds}
+                    onToggleFavorite={handleToggleFavCreator}
+                    showFavorite
                     className="text-primary hover:underline"
                   />
                 }

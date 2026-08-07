@@ -562,9 +562,26 @@ export interface Database {
           },
         ];
       };
+      app_counters: {
+        Row: {
+          key: string;
+          value: number;
+        };
+        Insert: {
+          key: string;
+          value?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["app_counters"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      increment_app_counter: {
+        Args: { counter_key: string };
+        Returns: number;
+      };
+    };
     Enums: {
       list_type: ListType;
       list_visibility: ListVisibility;

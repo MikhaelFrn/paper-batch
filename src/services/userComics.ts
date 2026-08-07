@@ -76,14 +76,17 @@ export async function upsertMyUserComic(
   );
 }
 
-/** Sets `owned` for many issues in one action (e.g. "mark #1-45 as owned"
- * from a volume page) — two batched calls total regardless of how many
- * issues are selected, not one round trip per issue. Existing collection
- * entries are updated in place (read/rating/notes untouched); issues with
- * no entry yet get a fresh one with those fields defaulted. */
-export async function bulkSetOwned(
+/** Sets one boolean field (`owned` or `read`) for many issues in one action
+ * (e.g. "mark #1-45 as owned" from a volume page) — two batched calls
+ * total regardless of how many issues are selected, not one round trip
+ * per issue. Existing collection entries are updated in place (the other
+ * fields untouched — marking issues owned never flips read, and vice
+ * versa); issues with no entry yet get a fresh one with everything else
+ * defaulted. */
+async function bulkSetUserComicField(
   issueIds: string[],
-  owned: boolean,
+  field: "owned" | "read",
+  value: boolean,
 ): Promise<void> {
   const uid = await requireUserId();
   if (issueIds.length === 0) return;
@@ -101,20 +104,24 @@ export async function bulkSetOwned(
   const toInsert = issueIds.filter((id) => !existingIds.has(id));
 
   if (toUpdate.length > 0) {
+    // A computed { [field]: value } key produces a string-index-signature
+    // type that Supabase's generated Update type rejects — spell out both
+    // shapes explicitly instead.
+    const patch: UserComicUpdate = field === "owned" ? { owned: value } : { read: value };
     const result = await supabase
       .from("user_comics")
-      .update({ owned })
+      .update(patch)
       .eq("user_id", uid)
       .in("issue_id", toUpdate);
-    throwIfError(result.error, "Failed to update owned status");
+    throwIfError(result.error, `Failed to update ${field} status`);
   }
   if (toInsert.length > 0) {
     const result = await supabase.from("user_comics").insert(
       toInsert.map((issueId) => ({
         user_id: uid,
         issue_id: issueId,
-        owned,
-        read: false,
+        owned: field === "owned" ? value : false,
+        read: field === "read" ? value : false,
         rating: null,
         notes: null,
         purchase_date: null,
@@ -122,6 +129,14 @@ export async function bulkSetOwned(
     );
     throwIfError(result.error, "Failed to create collection entries");
   }
+}
+
+export async function bulkSetOwned(issueIds: string[], owned: boolean): Promise<void> {
+  return bulkSetUserComicField(issueIds, "owned", owned);
+}
+
+export async function bulkSetRead(issueIds: string[], read: boolean): Promise<void> {
+  return bulkSetUserComicField(issueIds, "read", read);
 }
 
 export async function deleteMyUserComic(issueId: string): Promise<void> {

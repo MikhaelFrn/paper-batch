@@ -17,7 +17,7 @@ import {
 } from "@/hooks/useFavorites";
 import { useMyLists, useList } from "@/hooks/useLists";
 import { toast } from "sonner";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import { getCurrentUser, updateAuthUser } from "@/services/auth";
 
@@ -215,7 +215,7 @@ function Profile() {
               </div>
               <div>
                 <div className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">Favorite series</div>
-                <div className="flex flex-wrap gap-2">{(favSeries.data ?? []).map((s) => <span key={s.id} className="rounded-md border border-border bg-muted/40 px-2 py-1 text-xs">{s.name}</span>)}</div>
+                <div className="flex flex-wrap gap-2">{(favSeries.data ?? []).map((s) => <Link key={s.id} to="/search" search={{ q: s.name }} className="rounded-md border border-border bg-muted/40 px-2 py-1 text-xs hover:border-primary/40 hover:text-primary">{s.name}</Link>)}</div>
               </div>
               <div>
                 <div className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">Favorite creators</div>

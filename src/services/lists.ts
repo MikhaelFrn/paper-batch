@@ -183,6 +183,34 @@ export async function addIssueToList(
   }
 }
 
+/** Bulk version (e.g. "add #2-9 to my wishlist" from a volume page).
+ * Pre-filters out issues already in the list rather than inserting
+ * everything and swallowing 23505 like the single-issue version above —
+ * a multi-row insert is one SQL statement, so a single conflicting row
+ * would abort the *entire* batch, not just that row. */
+export async function bulkAddIssuesToList(
+  listId: string,
+  issueIds: string[],
+): Promise<void> {
+  if (issueIds.length === 0) return;
+  const existing = unwrap(
+    await supabase
+      .from("list_items")
+      .select("issue_id")
+      .eq("list_id", listId)
+      .in("issue_id", issueIds),
+    "Failed to check existing list items",
+  );
+  const existingIds = new Set(existing.map((e) => e.issue_id));
+  const toInsert = issueIds.filter((id) => !existingIds.has(id));
+  if (toInsert.length === 0) return;
+
+  const { error } = await supabase
+    .from("list_items")
+    .insert(toInsert.map((issueId) => ({ list_id: listId, issue_id: issueId })));
+  if (error) throw new Error(error.message);
+}
+
 export async function removeIssueFromList(
   listId: string,
   issueId: string,

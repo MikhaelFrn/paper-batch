@@ -9,6 +9,7 @@ import type {
   Volume,
 } from "@/lib/types";
 import { unwrap } from "./_utils";
+import { backfillCoverHashes } from "./coverHash";
 
 const ISSUE_WITH_RELATIONS =
   "*, volume:volumes(*, series:series(*, publisher:publishers(*))), issue_creators(role, creator:creators(*))" as const;
@@ -164,4 +165,28 @@ export async function searchAll(
       "Failed to search publishers",
     ) as Publisher[],
   };
+}
+
+const COVER_BACKFILL_SEARCH_INTERVAL = 10;
+
+/** Fire-and-forget: bumps a shared, DB-backed search counter and, every
+ * Nth search app-wide, kicks off a cover-hash backfill catch-up run.
+ * Stands in for a cron job — there's no scheduler in this app's current
+ * (unhosted) setup, so "enough real usage has happened" substitutes for a
+ * wall-clock schedule. The counter lives in Postgres (increment_app_counter
+ * RPC — see the "app_counters" table setup), not in-process memory, since
+ * a serverless/edge deployment doesn't share memory across requests or
+ * survive between them. Never awaited by callers — a search shouldn't
+ * wait on unrelated maintenance work. */
+export async function notifySearchPerformed(): Promise<void> {
+  const { data: count, error } = await supabase.rpc("increment_app_counter", {
+    counter_key: "search_count",
+  });
+  if (error) {
+    console.error("Failed to increment search counter:", error);
+    return;
+  }
+  if (count > 0 && count % COVER_BACKFILL_SEARCH_INTERVAL === 0) {
+    backfillCoverHashes().catch((e) => console.error("Auto cover-hash backfill failed:", e));
+  }
 }

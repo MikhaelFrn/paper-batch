@@ -9,6 +9,7 @@ import type {
 import {
   addIssueToList,
   addListMember,
+  bulkAddIssuesToList,
   createList,
   deleteList,
   getList,
@@ -107,6 +108,17 @@ export function useAddIssueToList() {
   return useMutation({
     mutationFn: ({ listId, issueId }: { listId: string; issueId: string }) =>
       addIssueToList(listId, issueId),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.lists.detail(vars.listId) });
+    },
+  });
+}
+
+export function useBulkAddIssuesToList() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ listId, issueIds }: { listId: string; issueIds: string[] }) =>
+      bulkAddIssuesToList(listId, issueIds),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.lists.detail(vars.listId) });
     },
