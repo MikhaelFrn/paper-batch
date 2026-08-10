@@ -11,6 +11,7 @@ import { useSearch } from "@/hooks/useSearch";
 import { useComicVineSearch, useLoadMoreComicVineIssues } from "@/hooks/useComicVine";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { issueToComic, cvIssueToComic } from "@/lib/comic-adapters";
+import { getKnownSafeErrorMessage } from "@/lib/rate-limit-messages";
 import type { CvSearchIssue } from "@/integrations/comicvine/types";
 
 export const Route = createFileRoute("/_shell/search")({
@@ -145,6 +146,15 @@ function SearchPage() {
         <p className="text-sm text-muted-foreground">Searching…</p>
       ) : !data ? null : (
         <>
+          {cvSearch.isError && (
+            // Local-DB results (below) are unaffected by this — only the
+            // ComicVine-sourced portion (not-yet-catalogued comics/volumes)
+            // is missing, so this is a small notice, not a blocking error.
+            <p className="mb-6 text-sm text-muted-foreground">
+              {getKnownSafeErrorMessage(cvSearch.error) ??
+                "Couldn't reach ComicVine for uncatalogued results — showing what's in your library only."}
+            </p>
+          )}
           <Group title="Comics" count={issueComics.length}>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
               {issueComics.map((c) => <ComicCard key={c.id} comic={c} />)}

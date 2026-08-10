@@ -88,10 +88,21 @@ export const getNewArrivals = createServerFn({ method: "GET" }).handler(
 // docs/comicvine-and-runs.md for why. Everything else here is a
 // straightforward upsert-by-comicvine_id.
 
+// Trailing "Annual"/"Special"/etc., optionally followed by a year or
+// issue number ("Amazing Spider-Man Annual 2020", "Batman Special #1") —
+// stripped so these group into their parent series rather than becoming
+// their own separate one. Explicit decision (previously an open question
+// in docs/comicvine-and-runs.md): annuals/specials/one-shots are
+// additional publications *of* a series, not a distinct series of their
+// own. Anchored to the end and requires a preceding word, so a volume
+// actually just named "Annual" with nothing else wouldn't match.
+const ANNUAL_SUFFIX = /\s+(annual|special|one-shot|one shot|giant-size|giant size)s?(\s*#?\d+)?$/i;
+
 function normalizeSeriesName(name: string): string {
   return name
     .toLowerCase()
     .replace(/^the\s+/, "")
+    .replace(ANNUAL_SUFFIX, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 }

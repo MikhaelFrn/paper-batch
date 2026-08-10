@@ -5,6 +5,7 @@
 // That budget is tiny, which is why every caller must check the
 // barcode_lookups cache table before ever reaching this — see services/barcode.ts.
 import { ServiceError } from "@/lib/types";
+import { UPCITEMDB_QUOTA_MESSAGE } from "@/lib/rate-limit-messages";
 
 const TRIAL_LOOKUP_URL = "https://api.upcitemdb.com/prod/trial/lookup";
 
@@ -47,10 +48,7 @@ export async function lookupUpc(upc: string): Promise<UpcLookupOutcome> {
   const rateLimitRemaining = remainingHeader !== null ? Number(remainingHeader) : null;
 
   if (response.status === 429) {
-    throw new ServiceError(
-      "Barcode lookup limit reached for today — try again tomorrow, or add this comic by searching for it.",
-      { code: "RATE_LIMITED" },
-    );
+    throw new ServiceError(UPCITEMDB_QUOTA_MESSAGE, { code: "RATE_LIMITED" });
   }
   if (!response.ok) {
     throw new ServiceError(`UPCitemdb request failed: ${response.status}`);

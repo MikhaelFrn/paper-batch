@@ -12,6 +12,7 @@ import { useComicVineSearch } from "@/hooks/useComicVine";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useIssue } from "@/hooks/useIssues";
 import { cvIssueToComic, issueToComic } from "@/lib/comic-adapters";
+import { getKnownSafeErrorMessage } from "@/lib/rate-limit-messages";
 
 const RATE_LIMIT_WARNING_THRESHOLD = 10;
 
@@ -69,9 +70,11 @@ function BarcodeQueryStep({
             ? "Type a title to search."
             : cvSearch.isLoading
               ? "Searching…"
-              : issues.length === 0
-                ? "No matches — try adjusting the search above."
-                : `${issues.length} result${issues.length === 1 ? "" : "s"}`}
+              : cvSearch.isError
+                ? (getKnownSafeErrorMessage(cvSearch.error) ?? "Couldn't search ComicVine — try again in a moment.")
+                : issues.length === 0
+                  ? "No matches — try adjusting the search above."
+                  : `${issues.length} result${issues.length === 1 ? "" : "s"}`}
         </p>
         <Button variant="outline" size="sm" onClick={onRescan}><RotateCcw className="h-4 w-4" />Scan again</Button>
       </div>
@@ -192,10 +195,13 @@ function ScanBarcodePage() {
         // The underlying error (e.g. a raw Postgres/PostgREST message) is
         // developer detail, not something to put in front of a friend using
         // the app — log it for debugging, show a generic message instead.
+        // Exception: a known quota/rate-limit message (UPCitemdb's daily
+        // cap, or ComicVine's if the "needs-query" step's search already
+        // hit it) is deliberately written to be shown as-is.
         console.error("Barcode lookup failed:", error);
         setPhase({
           kind: "error",
-          message: "Couldn't look up that barcode. Try again in a moment.",
+          message: getKnownSafeErrorMessage(error) ?? "Couldn't look up that barcode. Try again in a moment.",
         });
       },
     });

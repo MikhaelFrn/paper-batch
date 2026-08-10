@@ -38,11 +38,22 @@ before or around that point.
   a `/goodbye` page.
 - **Google sign-in** — was decorative on login, missing entirely on
   signup. Now wired on both, landing at `/auth/callback` which waits for
-  the session and hands off into the app. Still needs the redirect URL
-  added in Supabase's dashboard (Authentication → URL Configuration) —
-  `http://localhost:8080/auth/callback` for dev, plus the production
-  domain's version once hosted — and an actual end-to-end click-through
-  hasn't been confirmed yet.
+  the session and hands off into the app. Redirect URL added in
+  Supabase's dashboard, full account-creation-through-deletion flow
+  confirmed working live. Still needs the *production* domain's callback
+  URL added once hosted — `localhost` is the only one allowlisted so far.
+- **Auto cover-hash backfill, without a cron job** — every 10th search
+  app-wide (via a Postgres-backed counter + RPC, since this app has no
+  scheduler and a serverless deploy can't hold an in-memory counter
+  between requests) triggers a background catch-up run. Verified live
+  under a real authenticated session, not just the service-role key.
+  Also closed the existing gap this uncovered: 15 issues were missing
+  their hash despite having a cover image; all re-hashed.
+- **Vercel deploy target** — the Lovable-scaffolded Vite config defaults
+  to a Cloudflare Workers build; confirmed live that `npm run build`
+  produced a Wrangler bundle, not something Vercel can run. Pinned
+  `nitro: { preset: "vercel" }` in `vite.config.ts`; rebuilding now
+  correctly produces `.vercel/output/functions/...`.
 - **Shared-list role colors** — lists you're an editor/viewer on (not
   owner) now get an orange/purple banner gradient in the Lists grid
   instead of blending in with everything else.
@@ -85,15 +96,6 @@ before or around that point.
 
 ## Explicitly deferred feature work
 
-- **Editable-title-before-search review step** for barcode/cover-hash
-  imports. Designed in detail (trim retail boilerplate like `" - by Author
-  & Author (Paperback)"`, keep the result editable before it hits
-  ComicVine search) but never built — the most concrete unfinished thread.
-- **Auto-schedule the cover-hash backfill** (e.g. weekly). Blocked on
-  having real hosting to run a cron job against.
-- **Re-check `MIN_SIMILARITY = 45`** (`src/services/coverHash.ts`) now that
-  similarity percentages are trustworthy — that threshold was picked back
-  when the base-64 hash-encoding bug was silently deflating every score.
 - **"Skip issues already known locally"** optimization for `analyzeVolume`
   (`src/services/runs.ts`), and an **issue-range / "block run"** analysis
   option for huge volumes — both discussed as cost-saving ideas, not built.
@@ -102,38 +104,90 @@ before or around that point.
   runs). The table exists in the schema already; nothing in the app reads
   or writes it yet.
 
+## Decided this session
+
+- **Co-writer "primary writer" rule**: keep first-listed credit. No code
+  change — this was already the behavior, just formally confirmed rather
+  than an open question.
+- **Annuals/specials/one-shots**: group into their parent series. Built —
+  `normalizeSeriesName` (`src/services/comicvine.ts`) now strips a
+  trailing "Annual"/"Special"/"One-Shot"/"Giant-Size", optionally followed
+  by a year or issue number, before matching/creating a series. Verified
+  against several real naming patterns, including that a volume genuinely
+  just named "Annual" (no preceding word) isn't affected. Deliberately
+  *not* mirrored into `comic-adapters.ts`'s copy of the same function —
+  that one feeds "already own something similar?" duplicate detection,
+  where an annual and a regular issue sharing a number are NOT the same
+  physical comic.
+- **New Arrivals scope**: stay a single global feed, no per-user
+  personalization for now. No code change — already the current behavior.
+- **Publisher naming consistency (found while resolving the above)**: the
+  DC-badge mismatch turned out to be one symptom of a bigger issue —
+  `NEW_ARRIVALS_PUBLISHERS` used shorthand names ("DC", "Dark Horse",
+  "Boom Studios", "IDW", "Valiant") that matched neither ComicVine's own
+  canonical names nor what `upsertPublisher` stores locally, so 5 of 7
+  publishers displayed under two different names depending on whether a
+  comic came from New Arrivals or was actually imported. Fixed by
+  switching every publisher-name map (`NEW_ARRIVALS_PUBLISHERS`,
+  `publisherAccent`, `PublisherBadge`'s color map) to the same
+  ComicVine-verified canonical names used everywhere else.
+- **Gap-merged run display name** (e.g. `"Writer's Run #1-#6"` even when
+  #2-3 belong to a different run): keeping as-is, on purpose — the range
+  framing is actually useful as-is, since it signals "a different writer
+  interrupted this" without visually fragmenting a run that IS one
+  creative run despite the gap.
+- **`MIN_SIMILARITY = 45`** (`src/services/coverHash.ts`): keeping as-is.
+  Worth flagging a mix-up first raised here — this threshold is cover-hash
+  *image* matching (the "scan a cover to check what you own" feature), not
+  related to run derivation's confidence scoring at all; keeping it as-is
+  stands on its own regardless.
+- **`database.types.ts` regenerated for real** — the file had been
+  hand-augmented at some point with convenience type aliases
+  (`ListType`, `ListMemberRole`, etc.) that aren't part of what
+  `supabase gen types` actually outputs, which is exactly how it drifted
+  silently (real enum name is `list_role`, not the `list_member_role` this
+  file assumed). Now the file is the untouched generated output; the
+  convenience aliases moved into `src/lib/types.ts` instead, deriving them
+  via the generated `Enums<>` helper so a future regen never fights with
+  hand edits again.
+
 ## Found this session, deliberately left alone
 
-- `PublisherBadge` / `publisherAccent` (`src/components/comic-card.tsx`,
-  `src/lib/comic-adapters.ts`) key for DC is `"DC"`, matching New Arrivals'
-  ComicVine-shorthand publisher names — but the local `publishers` table
-  stores `"DC Comics"`, so DC badges on your own collection render
-  unstyled. Needs a real naming-normalization decision, not a one-line
-  swap, since both paths currently depend on being different strings.
-- `covers.issue_id` has no unique DB constraint. Nothing's broken by it
-  today (app logic prevents duplicates), but worth adding before this
-  becomes a multi-device or concurrent-import setup.
-- A gap-merged run's display name (e.g. `"Writer's Run #1-#6"`) reads as a
-  continuous range even when the issues in between actually belong to a
-  different run — cosmetic only, not a data bug.
-
-## Never decided, still open (from the original design notes)
-
-- Co-writer "primary writer" rule for run derivation — currently just
-  takes the first writer credit found.
-- Series matching for annuals/specials/one-shots — "decide once, apply
-  consistently" was the plan, never actually decided.
-- New Arrivals: personalized via favorites, or stay a global feed.
+- `covers.issue_id` has no unique DB constraint — confirmed live no
+  duplicates exist yet, so safe to add:
+  `alter table covers add constraint covers_issue_id_key unique (issue_id);`
+  Not run yet — needs real SQL access this session doesn't have.
 
 ## Pre-launch hygiene not yet raised
 
 - No test suite exists anywhere in the repo. For logic as fiddly as run
   derivation or search matching, even light regression coverage would
   catch silent breakage from future edits.
-- A real secrets audit before hosting: confirm the ComicVine key, Supabase
-  service-role key, and anything else server-only genuinely never reaches
-  the client bundle.
-- Graceful behavior when UPCitemdb's 100/day shared quota or ComicVine's
-  rate limit actually gets hit in real use, not just in theory.
+- Secrets audit: confirmed live (grepped every env var reference in
+  `src`) that only `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`
+  are client-exposed by design; `SUPABASE_SERVICE_ROLE_KEY` and
+  `COMICVINE_KEY` are server-only reads, never `VITE_`-prefixed. Still
+  worth a real look at what actually ships in the client bundle once
+  hosted, rather than trusting the naming convention alone.
 - No accessibility pass has happened beyond one reactive `aria-hidden`
   fix — worth a real pass if this goes in front of people other than you.
+
+## Done (continued)
+
+- **Graceful UX for API quota/rate-limit exhaustion.** UPCitemdb's side
+  already had a good, specific message — it just never reached the user;
+  `_shell.scan_.barcode.tsx`'s `onError` always showed a hardcoded generic
+  string regardless of the real error. ComicVine's client had no
+  rate-limit detection at all (any non-ok response, including a 420,
+  produced a raw `"ComicVine request failed: 420 ..."`). Bigger finding:
+  New Arrivals and the search page's ComicVine section had *no* error
+  handling whatsoever — a rate-limited failure silently rendered as
+  "nothing found," actively misleading. Fixed by verifying (by reading
+  TanStack Start's own `ShallowErrorPlugin` source, not assuming) that a
+  `createServerFn`-thrown error only preserves `.message` across the
+  client/server boundary — `.code`/`instanceof` are dropped, reconstructed
+  as a plain `Error` — so `src/lib/rate-limit-messages.ts` recognizes safe
+  messages by exact text instead. Applied everywhere ComicVine or
+  UPCitemdb calls can surface: barcode lookup, the barcode flow's
+  ComicVine-search step, importing any not-yet-catalogued comic
+  (`ComicCard`), volume analysis, New Arrivals, and search.

@@ -1,15 +1,20 @@
-// @lovable.dev/vite-tanstack-config already includes the following — do NOT add them manually
-// or the app will break with duplicate plugins:
-//   - TanStack devtools (dev-only, first), tanstackStart, viteReact, tailwindcss, tsConfigPaths,
-//     nitro (build-only using cloudflare as a default target), VITE_* env injection, @ path alias,
-//     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
-// You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
   tanstackStart: {
-    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    // nitro/vite builds from this
     server: { entry: "server" },
+  },
+  // The Lovable config wrapper defaults nitro to the `cloudflare-module`
+  // preset (see node_modules/@lovable.dev/vite-tanstack-config's own
+  // docs) — confirmed live that a plain `npm run build` produces a
+  // Cloudflare Worker bundle (.output/server/wrangler.json), not
+  // something Vercel can run. Pinning the preset explicitly, rather than
+  // relying on Nitro's env-based auto-detection, since the wrapper's docs
+  // also warn the preset can be *forced* to Cloudflare inside a Lovable
+  // build regardless of auto-detection — explicit is the only path
+  // verified to actually produce Vercel's Build Output API format
+  // (.vercel/output/functions/...).
+  nitro: {
+    preset: "vercel",
   },
 });

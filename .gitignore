@@ -26,6 +26,9 @@ src/routeTree.gen.ts
 .wrangler/
 .dev.vars
 
+# Vercel
+.vercel
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

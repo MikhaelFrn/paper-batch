@@ -5,6 +5,7 @@ import { ComicCover } from "./comic-cover";
 import { Badge } from "@/components/ui/badge";
 import type { Comic } from "@/lib/comic-adapters";
 import { cn } from "@/lib/utils";
+import { getKnownSafeErrorMessage } from "@/lib/rate-limit-messages";
 import { useImportComicVineIssue } from "@/hooks/useComicVine";
 
 function formatYear(releaseDate: string): number | null {
@@ -88,8 +89,8 @@ function UnimportedComicCard({
           onImported?.(issueId);
           navigate({ to: "/comic/$id", params: { id: issueId } });
         },
-        onError: () => {
-          toast.error("Couldn't import this issue from ComicVine.");
+        onError: (error) => {
+          toast.error(getKnownSafeErrorMessage(error) ?? "Couldn't import this issue from ComicVine.");
         },
       },
     );
@@ -147,14 +148,16 @@ export function ComicCard({
 }
 
 export function PublisherBadge({ publisher }: { publisher: Comic["publisher"] }) {
+  // Keys are ComicVine's actual canonical publisher names — see
+  // publisherAccent (comic-adapters.ts) for why this isn't shorthand.
   const cls: Record<string, string> = {
     Marvel: "bg-primary/15 text-primary border-primary/30",
-    DC: "bg-accent/15 text-accent border-accent/30",
+    "DC Comics": "bg-accent/15 text-accent border-accent/30",
     Image: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-    "Dark Horse": "bg-zinc-500/15 text-zinc-300 border-zinc-500/30",
-    "Boom Studios": "bg-amber-500/15 text-amber-400 border-amber-500/30",
-    IDW: "bg-red-500/15 text-red-300 border-red-500/30",
-    Valiant: "bg-violet-500/15 text-violet-300 border-violet-500/30",
+    "Dark Horse Comics": "bg-zinc-500/15 text-zinc-300 border-zinc-500/30",
+    "Boom! Studios": "bg-amber-500/15 text-amber-400 border-amber-500/30",
+    "IDW Publishing": "bg-red-500/15 text-red-300 border-red-500/30",
+    "DMG/Valiant Entertainment": "bg-violet-500/15 text-violet-300 border-violet-500/30",
   };
   return (
     <span className={cn("inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", cls[publisher])}>

@@ -6,26 +6,26 @@
 
 import type {
   Database,
+  Enums,
   Tables,
   TablesInsert,
   TablesUpdate,
-  ListType,
-  ListVisibility,
-  ListMemberRole,
-  RunType,
-  RunStatus,
-  RelationshipType,
 } from "@/integrations/supabase/database.types";
 
 export type { Database, Tables, TablesInsert, TablesUpdate };
-export type {
-  ListType,
-  ListVisibility,
-  ListMemberRole,
-  RunType,
-  RunStatus,
-  RelationshipType,
-};
+
+// Convenience aliases for enum values — kept here rather than hand-added to
+// database.types.ts, which should stay exactly what `supabase gen types`
+// produces so it can be regenerated anytime without losing anything. Names
+// on the right are the real Postgres enum names (confirmed via a live
+// `gen types` run — `list_role`, not the `list_member_role` this file
+// previously assumed).
+export type ListType = Enums<"list_type">;
+export type ListVisibility = Enums<"list_visibility">;
+export type ListMemberRole = Enums<"list_role">;
+export type RunType = Enums<"run_type">;
+export type RunStatus = Enums<"run_status">;
+export type RelationshipType = Enums<"relationship_type">;
 // ---------- Row aliases ----------
 export type Publisher = Tables<"publishers">;
 export type Series = Tables<"series">;
@@ -69,9 +69,7 @@ export interface IssueWithRelations extends Issue {
         series: (Series & { publisher: Publisher | null }) | null;
       })
     | null;
-  issue_creators: Array<
-    Pick<IssueCreator, "role"> & { creator: Creator | null }
-  >;
+  issue_creators: Array<Pick<IssueCreator, "role"> & { creator: Creator | null }>;
 }
 
 export interface RunItemWithRelations extends RunItem {

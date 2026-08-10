@@ -66,14 +66,20 @@ export interface CustomList {
 
 // ---------- Publisher visual tokens ----------
 
+// Keys are ComicVine's actual canonical publisher names (verified live
+// against the real API, not guessed) — matching what upsertPublisher
+// stores for every locally-imported comic. Previously used shorthand
+// ("DC", "Dark Horse", "Boom Studios", "IDW", "Valiant") that only
+// matched New Arrivals' own shorthand map, not anything actually in the
+// DB, so most publisher badges outside New Arrivals rendered unstyled.
 export const publisherAccent: Record<string, string> = {
   Marvel: "var(--gradient-marvel)",
-  DC: "var(--gradient-dc)",
+  "DC Comics": "var(--gradient-dc)",
   Image: "var(--gradient-image)",
-  "Dark Horse": "var(--gradient-darkhorse)",
-  "Boom Studios": "var(--gradient-boom)",
-  IDW: "var(--gradient-idw)",
-  Valiant: "var(--gradient-valiant)",
+  "Dark Horse Comics": "var(--gradient-darkhorse)",
+  "Boom! Studios": "var(--gradient-boom)",
+  "IDW Publishing": "var(--gradient-idw)",
+  "DMG/Valiant Entertainment": "var(--gradient-valiant)",
 };
 
 export function getPublisherAccent(publisher: string | null | undefined): string {
@@ -81,10 +87,16 @@ export function getPublisherAccent(publisher: string | null | undefined): string
   return "linear-gradient(135deg, oklch(0.35 0.05 260), oklch(0.20 0.05 260))";
 }
 
-// Mirrors services/comicvine.ts's normalizeSeriesName (kept separate rather
-// than imported — that module expects a server-side Supabase client through
-// most of its exports, not something to pull into client-rendered code just
-// for this one pure string helper).
+// Partial mirror of services/comicvine.ts's normalizeSeriesName (kept
+// separate rather than imported — that module expects a server-side
+// Supabase client through most of its exports, not something to pull into
+// client-rendered code just for this one pure string helper). Deliberately
+// does NOT also strip "Annual"/"Special"/etc. suffixes the way the server
+// version does: that version groups annuals into their parent *series* for
+// browsing, which is correct there, but this one feeds "already own
+// something similar?" duplicate detection (comic.$id.tsx), where an annual
+// and a regular issue sharing an issue number are NOT the same physical
+// comic — collapsing them here would misfire that warning.
 export function normalizeSeriesName(name: string): string {
   return name
     .toLowerCase()

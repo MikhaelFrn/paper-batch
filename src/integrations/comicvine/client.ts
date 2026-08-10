@@ -2,6 +2,7 @@
 // code — the key is a server secret and ComicVine doesn't allow browser CORS
 // requests anyway.
 import { ServiceError } from "@/lib/types";
+import { COMICVINE_RATE_LIMIT_MESSAGE } from "@/lib/rate-limit-messages";
 import type {
   CvIssueDetail,
   CvSearchIssue,
@@ -44,6 +45,16 @@ async function cvGet<T>(
   const response = await fetch(parsed, {
     headers: { "User-Agent": USER_AGENT },
   });
+  // ComicVine's own velocity/burst detection returns 420 ("Rate limit
+  // exceeded. Slow down cowboy.") separately from the documented 200
+  // requests/resource/hour cap — confirmed live, see getIssueDetailsBatch
+  // below. Checked before the generic !response.ok branch so every single
+  // ComicVine-backed feature (search, volume analysis, New Arrivals,
+  // barcode's ComicVine-search step) gets the same recognizable, safe-to-
+  // show message instead of a raw "420 " status dump.
+  if (response.status === 420 || response.status === 429) {
+    throw new ServiceError(COMICVINE_RATE_LIMIT_MESSAGE, { code: "RATE_LIMITED" });
+  }
   if (!response.ok) {
     throw new ServiceError(
       `ComicVine request failed: ${response.status} ${response.statusText}`,
@@ -274,16 +285,21 @@ export async function getVolumeDetail(
 // denylist, this needs an allowlist of publishers to be worth showing at
 // all. IDs resolved via /publishers/?filter=name:X against the live API,
 // not guessed.
-// Names match PublisherBadge / publisherAccent's existing keys (comic-adapters.ts)
-// so these get the same styled badges as locally-catalogued comics.
+// Names are ComicVine's actual canonical publisher names (each verified
+// live against /publisher/{id}), matching PublisherBadge / publisherAccent's
+// keys (comic-adapters.ts) — previously used shorthand ("DC", "Dark
+// Horse", "Boom Studios", "IDW", "Valiant") that matched neither CV's own
+// name nor what upsertPublisher stores locally, so the same real-world
+// publisher displayed under two different names depending on whether a
+// comic came from New Arrivals or was actually imported.
 export const NEW_ARRIVALS_PUBLISHERS: Record<string, number> = {
   Marvel: 31,
-  DC: 10,
+  "DC Comics": 10,
   Image: 513,
-  "Dark Horse": 364,
-  "Boom Studios": 1868,
-  IDW: 1190,
-  Valiant: 1924,
+  "Dark Horse Comics": 364,
+  "Boom! Studios": 1868,
+  "IDW Publishing": 1190,
+  "DMG/Valiant Entertainment": 1924,
   "Red 5 Comics": 2048,
 };
 const NEW_ARRIVALS_PUBLISHER_IDS = new Set(Object.values(NEW_ARRIVALS_PUBLISHERS));

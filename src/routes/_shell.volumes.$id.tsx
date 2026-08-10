@@ -21,6 +21,7 @@ import { useRunsForVolume, useAnalyzeVolume } from "@/hooks/useRuns";
 import { useBulkSetOwned, useBulkSetRead, useUserCollection } from "@/hooks/useUserComics";
 import { useBulkAddIssuesToList, useMyLists } from "@/hooks/useLists";
 import { issueToComic } from "@/lib/comic-adapters";
+import { getKnownSafeErrorMessage } from "@/lib/rate-limit-messages";
 
 export const Route = createFileRoute("/_shell/volumes/$id")({
   head: () => ({
@@ -82,7 +83,14 @@ function AnalyzeButton({
         },
         onError: (error) => {
           console.error("Volume analysis failed:", error);
-          toast.error("Couldn't analyze this volume — check the console for details.");
+          // Analysis is the single most likely thing in the app to
+          // actually trip ComicVine's rate limit — it fires one call per
+          // issue in the volume. Worth naming that specifically instead
+          // of "check the console," which most people never do.
+          toast.error(
+            getKnownSafeErrorMessage(error) ??
+              "Couldn't analyze this volume — check the console for details.",
+          );
         },
       },
     );

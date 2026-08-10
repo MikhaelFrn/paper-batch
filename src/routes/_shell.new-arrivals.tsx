@@ -5,6 +5,7 @@ import { ComicCard, PublisherBadge } from "@/components/comic-card";
 import { Button } from "@/components/ui/button";
 import { useNewArrivals } from "@/hooks/useComicVine";
 import { cvIssueToComic } from "@/lib/comic-adapters";
+import { getKnownSafeErrorMessage } from "@/lib/rate-limit-messages";
 
 export const Route = createFileRoute("/_shell/new-arrivals")({
   head: () => ({
@@ -52,6 +53,10 @@ function NewArrivals() {
       </div>
       {arrivals.isLoading ? (
         <div className="py-10 text-sm text-muted-foreground">Loading new arrivals…</div>
+      ) : arrivals.isError ? (
+        <div className="py-10 text-sm text-destructive">
+          {getKnownSafeErrorMessage(arrivals.error) ?? "Couldn't load new arrivals — try again in a moment."}
+        </div>
       ) : weekly.length === 0 ? (
         <div className="py-10 text-sm text-muted-foreground">No new arrivals found for this week.</div>
       ) : (
