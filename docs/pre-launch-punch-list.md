@@ -96,9 +96,6 @@ before or around that point.
 
 ## Explicitly deferred feature work
 
-- **"Skip issues already known locally"** optimization for `analyzeVolume`
-  (`src/services/runs.ts`), and an **issue-range / "block run"** analysis
-  option for huge volumes — both discussed as cost-saving ideas, not built.
 - **Cross-volume run continuation** (`run_relationships` —
   `continuation` / `recommended_before` / `tie-in` typed links between
   runs). The table exists in the schema already; nothing in the app reads
@@ -191,3 +188,38 @@ before or around that point.
   UPCitemdb calls can surface: barcode lookup, the barcode flow's
   ComicVine-search step, importing any not-yet-catalogued comic
   (`ComicCard`), volume analysis, New Arrivals, and search.
+- **`analyzeVolume` skips already-known issues, plus issue-range analysis.**
+  The actual waste: `getIssueDetailsBatch` fired one ComicVine call per
+  issue *unconditionally*, even though `upsertIssue` right after it
+  already skips re-inserting known issues — so for anything already
+  imported (via search/barcode, or an earlier pass), the expensive fetch
+  happened and its result was just discarded. `loadAlreadyKnownIssues`
+  now reconstructs an issue's credits from the local DB (verified live
+  against real data, including that writer-detection still picks the
+  same first-listed credit the fresh-fetch path would) whenever
+  `issue_creators` rows already exist, skipping the fetch entirely.
+  Also added `issueRange` (optional `{from, to}`) so a long-running title
+  can be analyzed in chunks over time instead of all at once — a
+  whole-volume request still refuses to re-run once any run exists, but a
+  ranged request never is, since re-analyzing a range on purpose is a
+  deliberate choice at that point. The "is this volume still ongoing"
+  flag now only applies when the analyzed range actually reaches the
+  volume's true latest issue (by date, not array position — verified
+  with synthetic data that an early chunk doesn't get treated as
+  ongoing, and reversed `{from, to}` input normalizes correctly).
+- **Failed login showed nothing.** Root cause wasn't the login page's
+  error handling (that was already correct) — `<Toaster />` was only
+  mounted in `_shell.tsx`, the authenticated-layout route, so any page
+  outside it (login, signup, forgot-password, reset-password, goodbye,
+  auth callback) had nowhere to render a toast at all; `toast.error(...)`
+  on those pages was a silent no-op. Moved `<Toaster />` to
+  `__root.tsx`, which wraps every route. (Sonner's toaster is a
+  client-side portal, so this can't be confirmed via SSR HTML alone —
+  worth a real click-through with a wrong password.)
+- **Volume-analysis loading state.** Added a "this can take a while — one
+  ComicVine call for every issue not already in your catalog" message
+  while `analyzeVolume` is pending, and simplified the button labels
+  that had gotten cluttered from the range-analysis work. The
+  disclaimer paragraph already mentioned analyzing a range for large
+  runs from the earlier `issueRange` work, so no change was needed
+  there.

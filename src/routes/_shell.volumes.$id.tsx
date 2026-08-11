@@ -40,23 +40,32 @@ function volumeDetailUrlFromComicVineId(comicvineId: number): string {
 }
 
 /** ComicVine's own API is free but rate-limited (per key, not per user) —
- * this fetches full credits for every issue at once (see
- * getIssueDetailsBatch), which for a long-running volume is dozens of calls
- * fired in one go. Comic Vault is a small fan project running on that free
- * plan, shared across search, new arrivals, and every other feature that
- * hits ComicVine — running this back-to-back on multiple volumes can
+ * this fetches full credits for whatever isn't already known locally (see
+ * loadAlreadyKnownIssues), which for a long-running volume you're just
+ * starting on is still dozens of calls fired in one go. Comic Vault is a
+ * small fan project running on that free plan, shared across search, new
+ * arrivals, and every other feature that hits ComicVine — running this
+ * back-to-back on multiple volumes (or a huge range on one) can
  * temporarily rate-limit all of them for everyone using the app. */
 function AnalyzeDisclaimer() {
   return (
     <p className="-mt-3 mb-6 max-w-2xl text-xs text-muted-foreground">
       This is a small fan project on ComicVine's free plan — analyzing a volume pulls credits for
-      every issue in it at once, which can be dozens of calls. Please don't run it back-to-back on
-      several volumes; doing so can temporarily break search and new arrivals for everyone using the
-      app, not just you.
+      every issue that isn't already in your catalog, which can still be dozens of calls for a big
+      one. If it's a really long-running title, consider analyzing it a range at a time instead of
+      all at once. Please don't run it back-to-back on several volumes either way; doing so can
+      temporarily break search and new arrivals for everyone using the app, not just you.
     </p>
   );
 }
 
+/** `issueRange`, when given, scopes analysis to just that slice instead of
+ * the whole volume — the point for a long-running title is that #1-100
+ * today and #101-200 next week both work, and each pass only pays for
+ * whatever wasn't already known going in (see analyzeVolume's
+ * skippedKnownIssues). Both actions share one mutation (can't run two
+ * analyses at once anyway); `analyze.variables` tells which one is
+ * actually in flight so only the button that was clicked shows as busy. */
 function AnalyzeButton({
   detailUrl,
   hasExistingRuns,
@@ -66,17 +75,29 @@ function AnalyzeButton({
 }) {
   const navigate = useNavigate();
   const analyze = useAnalyzeVolume();
+  const [rangeMode, setRangeMode] = useState(false);
+  const [rangeFrom, setRangeFrom] = useState("");
+  const [rangeTo, setRangeTo] = useState("");
 
-  const handleAnalyze = () => {
+  const isPendingRange = analyze.isPending && !!analyze.variables?.issueRange;
+  const isPendingWhole = analyze.isPending && !analyze.variables?.issueRange;
+
+  const runAnalyze = (issueRange?: { from: number; to: number }) => {
     analyze.mutate(
-      { volumeDetailUrl: detailUrl },
+      { volumeDetailUrl: detailUrl, issueRange },
       {
         onSuccess: (result) => {
           if (result.alreadyAnalyzed) {
             toast.info("This volume was already analyzed.");
+          } else if (result.totalIssues === 0) {
+            toast.info("No issues found in that range.");
           } else {
+            const skippedNote =
+              result.skippedKnownIssues > 0
+                ? ` (${result.skippedKnownIssues} already known, skipped)`
+                : "";
             toast.success(
-              `Found ${result.createdRuns} run${result.createdRuns === 1 ? "" : "s"} across ${result.totalIssues} issues.`,
+              `Found ${result.createdRuns} run${result.createdRuns === 1 ? "" : "s"} across ${result.totalIssues} issues${skippedNote}.`,
             );
           }
           navigate({ to: "/volumes/$id", params: { id: result.volumeId } });
@@ -85,8 +106,9 @@ function AnalyzeButton({
           console.error("Volume analysis failed:", error);
           // Analysis is the single most likely thing in the app to
           // actually trip ComicVine's rate limit — it fires one call per
-          // issue in the volume. Worth naming that specifically instead
-          // of "check the console," which most people never do.
+          // issue that isn't already known locally. Worth naming that
+          // specifically instead of "check the console," which most
+          // people never do.
           toast.error(
             getKnownSafeErrorMessage(error) ??
               "Couldn't analyze this volume — check the console for details.",
@@ -96,15 +118,54 @@ function AnalyzeButton({
     );
   };
 
+  const handleAnalyzeRange = () => {
+    const from = Number(rangeFrom);
+    const to = Number(rangeTo);
+    if (!Number.isFinite(from) || !Number.isFinite(to)) {
+      toast.error("Enter valid issue numbers for the range.");
+      return;
+    }
+    runAnalyze({ from, to });
+  };
+
   return (
-    <Button onClick={handleAnalyze} disabled={analyze.isPending}>
-      <Sparkles className="h-4 w-4" />
-      {analyze.isPending
-        ? "Analyzing… this can take a while for long-running volumes"
-        : hasExistingRuns
-          ? "Re-check for new runs"
-          : "Analyze this volume"}
-    </Button>
+    <div className="flex flex-col items-end gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button onClick={() => runAnalyze()} disabled={analyze.isPending}>
+          <Sparkles className="h-4 w-4" />
+          {isPendingWhole ? "Analyzing…" : hasExistingRuns ? "Re-check for new runs" : "Analyze this volume"}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setRangeMode((v) => !v)} disabled={analyze.isPending}>
+          {rangeMode ? "Cancel range" : "Analyze a range instead"}
+        </Button>
+      </div>
+      {analyze.isPending && (
+        <p className="text-xs text-muted-foreground">
+          This can take a while — one ComicVine call for every issue that isn't already in your
+          catalog. Hang tight.
+        </p>
+      )}
+      {rangeMode && (
+        <div className="flex items-center gap-1">
+          <Input
+            value={rangeFrom}
+            onChange={(e) => setRangeFrom(e.target.value)}
+            placeholder="#1"
+            className="h-8 w-16"
+          />
+          <span className="text-sm text-muted-foreground">to</span>
+          <Input
+            value={rangeTo}
+            onChange={(e) => setRangeTo(e.target.value)}
+            placeholder="#100"
+            className="h-8 w-16"
+          />
+          <Button size="sm" variant="outline" onClick={handleAnalyzeRange} disabled={analyze.isPending}>
+            {isPendingRange ? "Analyzing…" : "Analyze range"}
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 

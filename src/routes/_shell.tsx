@@ -2,7 +2,6 @@ import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Topbar } from "@/components/topbar";
-import { Toaster } from "@/components/ui/sonner";
 import { fetchServerUser } from "@/services/auth-server";
 import { useFixStuckBodyPointerEvents } from "@/hooks/useFixStuckBodyPointerEvents";
 
@@ -33,7 +32,6 @@ function ShellLayout() {
           </main>
         </SidebarInset>
       </div>
-      <Toaster />
     </SidebarProvider>
   );
 }

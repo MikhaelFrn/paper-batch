@@ -47,7 +47,8 @@ export function useRun(id: string | undefined) {
 export function useAnalyzeVolume() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { volumeDetailUrl: string }) => analyzeVolume({ data: input }),
+    mutationFn: (input: { volumeDetailUrl: string; issueRange?: { from: number; to: number } }) =>
+      analyzeVolume({ data: input }),
     onSuccess: (_result, _vars, _ctx) => {
       qc.invalidateQueries({ queryKey: queryKeys.runs.all });
     },
