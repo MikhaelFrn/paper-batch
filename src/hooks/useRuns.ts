@@ -1,11 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Run, RunWithItems } from "@/lib/types";
+import type { RelationshipType, Run, RunWithItems, RunWithRelations } from "@/lib/types";
 import {
   analyzeVolume,
+  createRunRelationship,
+  deleteRunRelationship,
   getRun,
   listRunsBySeries,
   listRunsForIssue,
   listRunsForVolume,
+  searchRunsForLinking,
 } from "@/services/runs";
 import { queryKeys } from "./queryKeys";
 
@@ -34,10 +37,45 @@ export function useRunsForIssue(issueId: string | undefined) {
 }
 
 export function useRun(id: string | undefined) {
-  return useQuery<RunWithItems | null>({
+  return useQuery<RunWithRelations | null>({
     queryKey: queryKeys.runs.detail(id ?? "unknown"),
     queryFn: () => getRun(id as string),
     enabled: !!id,
+  });
+}
+
+/** Runs matching `query` by name, for the run-detail page's "link this run
+ * to…" picker. `excludeRunId` keeps the run itself out of its own results. */
+export function useSearchRunsForLinking(query: string, excludeRunId: string) {
+  const trimmed = query.trim();
+  return useQuery<Run[]>({
+    queryKey: queryKeys.runs.searchForLinking(trimmed, excludeRunId),
+    queryFn: () => searchRunsForLinking(trimmed, excludeRunId),
+    enabled: trimmed.length > 0,
+  });
+}
+
+export function useCreateRunRelationship() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { sourceRunId: string; targetRunId: string; relationship: RelationshipType }) =>
+      createRunRelationship(input.sourceRunId, input.targetRunId, input.relationship),
+    onSuccess: (_result, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.runs.detail(vars.sourceRunId) });
+      qc.invalidateQueries({ queryKey: queryKeys.runs.detail(vars.targetRunId) });
+    },
+  });
+}
+
+export function useDeleteRunRelationship() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; sourceRunId: string; targetRunId: string }) =>
+      deleteRunRelationship(input.id),
+    onSuccess: (_result, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.runs.detail(vars.sourceRunId) });
+      qc.invalidateQueries({ queryKey: queryKeys.runs.detail(vars.targetRunId) });
+    },
   });
 }
 

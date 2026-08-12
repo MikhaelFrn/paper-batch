@@ -22,12 +22,20 @@ import {
   type RunDerivationIssueInput,
   type RunDerivationSegment,
 } from "@/lib/run-derivation";
-import type { Run, RunWithItems } from "@/lib/types";
+import type { RelationshipType, Run, RunWithItems, RunWithRelations } from "@/lib/types";
 import { ServiceError } from "@/lib/types";
 import { unwrap } from "./_utils";
 
 const RUN_WITH_ITEMS =
   "*, run_items(position, issue:issues(*, volume:volumes(*, series:series(*, publisher:publishers(*))), issue_creators(role, creator:creators(*)))), run_creators(role, creator:creators(*))" as const;
+
+// `run_relationships` self-references `runs` twice (source and target), so
+// each embed needs its FK constraint name to disambiguate which column
+// PostgREST should join on — see fk_source_run/fk_target_run in the
+// migration. Only used by getRun (the run detail page); the lighter
+// listRunsFor* lookups above don't need relationships.
+const RUN_WITH_RELATIONS =
+  `${RUN_WITH_ITEMS}, outgoing_relationships:run_relationships!fk_source_run(*, target_run:runs!fk_target_run(*)), incoming_relationships:run_relationships!fk_target_run(*, source_run:runs!fk_source_run(*))`;
 
 /** Runs already derived for a volume — issue-scoped, since run_items links
  * to issues, not volumes, directly. Takes an explicit client because this
@@ -115,7 +123,7 @@ interface ImportedIssue {
 // same two date fields, and reusing this avoids a second, only-slightly-
 // different date-key helper for "which of these raw search results is
 // the volume's actual latest issue" (see rangeTouchesLatest below).
-function issueDateKey(detail: { store_date: string | null; cover_date: string | null }): string {
+export function issueDateKey(detail: { store_date: string | null; cover_date: string | null }): string {
   return detail.store_date ?? detail.cover_date ?? "";
 }
 
@@ -268,10 +276,46 @@ export interface AnalyzeVolumeResult {
   skippedKnownIssues: number;
 }
 
-function parseIssueNumberForRange(n: string | null): number | null {
+export function parseIssueNumberForRange(n: string | null): number | null {
   if (n == null) return null;
   const num = Number(n);
   return Number.isFinite(num) ? num : null;
+}
+
+/** Slices `issues` down to an inclusive `{from, to}` window by issue
+ * number — `from`/`to` reversed is normalized, not an error, since a
+ * volume page's range inputs don't enforce order. Issues whose number
+ * doesn't parse (a variant like "1AU") are excluded from a ranged pass;
+ * they're still included when there's no range at all. */
+export function filterIssuesByRange<T extends { issue_number: string | null }>(
+  issues: T[],
+  range: { from: number; to: number } | undefined,
+): T[] {
+  if (!range) return issues;
+  const [lo, hi] = range.from <= range.to ? [range.from, range.to] : [range.to, range.from];
+  return issues.filter((i) => {
+    const num = parseIssueNumberForRange(i.issue_number);
+    return num != null && num >= lo && num <= hi;
+  });
+}
+
+/** Whether a (possibly ranged) analysis pass reaches the volume's actual
+ * newest issue — the "is this volume still ongoing" flag only makes sense
+ * for a pass that does, since an earlier chunk has a firm boundary
+ * regardless of how recently *it* shipped. Compared by date string, not
+ * array position, since a raw issue-list fetch isn't guaranteed to come
+ * back in date order. No range at all trivially touches the latest issue. */
+export function computeRangeTouchesLatest(
+  allRawIssues: Array<{ store_date: string | null; cover_date: string | null }>,
+  rangedIssues: Array<{ store_date: string | null; cover_date: string | null }>,
+  hasRange: boolean,
+): boolean {
+  if (!hasRange) return true;
+  const latestDateKey = allRawIssues.reduce(
+    (max, i) => (issueDateKey(i) > max ? issueDateKey(i) : max),
+    "",
+  );
+  return latestDateKey !== "" && rangedIssues.some((i) => issueDateKey(i) === latestDateKey);
 }
 
 /** The expensive, explicit, user-triggered pipeline: import every issue of
@@ -316,14 +360,7 @@ export const analyzeVolume = createServerFn({ method: "POST" })
     }
 
     const allRawIssues = await getAllIssuesOfVolume(volumeDetail.id);
-    const rawIssues = data.issueRange
-      ? allRawIssues.filter((i) => {
-          const { from, to } = data.issueRange!;
-          const [lo, hi] = from <= to ? [from, to] : [to, from];
-          const num = parseIssueNumberForRange(i.issue_number);
-          return num != null && num >= lo && num <= hi;
-        })
-      : allRawIssues;
+    const rawIssues = filterIssuesByRange(allRawIssues, data.issueRange);
     if (rawIssues.length === 0) {
       return { volumeId, createdRuns: 0, totalIssues: 0, alreadyAnalyzed: false, skippedKnownIssues: 0 };
     }
@@ -354,19 +391,7 @@ export const analyzeVolume = createServerFn({ method: "POST" })
       return { issueId: localIssueId, writerKey: writer ? String(writer.id) : null };
     });
 
-    // A ranged pass whose slice doesn't reach the volume's true latest
-    // issue isn't "ongoing" in the sense this flag means (more issues
-    // might land soon) — it's just an earlier chunk with a firm boundary.
-    // Only the pass that actually includes the volume's newest issue
-    // needs that uncertainty. Computed from allRawIssues (already fetched
-    // above) rather than array position, since getAllIssuesOfVolume's
-    // fetch order isn't guaranteed to be date order.
-    const latestDateKey = allRawIssues.reduce(
-      (max, i) => (issueDateKey(i) > max ? issueDateKey(i) : max),
-      "",
-    );
-    const rangeTouchesLatest =
-      !data.issueRange || (latestDateKey !== "" && rawIssues.some((i) => issueDateKey(i) === latestDateKey));
+    const rangeTouchesLatest = computeRangeTouchesLatest(allRawIssues, rawIssues, !!data.issueRange);
     const segments = deriveRunSegments(sequence, {
       isOngoing: rangeTouchesLatest && isVolumeOngoing(imported.map((i) => i.detail)),
     });
@@ -397,14 +422,62 @@ export async function listRunsBySeries(_seriesId: string): Promise<Run[]> {
   return [];
 }
 
-export async function getRun(id: string): Promise<RunWithItems | null> {
+export async function getRun(id: string): Promise<RunWithRelations | null> {
   const result = await supabase
     .from("runs")
-    .select(RUN_WITH_ITEMS)
+    .select(RUN_WITH_RELATIONS)
     .eq("id", id)
     .maybeSingle();
   if (result.error) {
     throw new ServiceError("Failed to load run", { cause: result.error });
   }
-  return result.data as unknown as RunWithItems | null;
+  return result.data as unknown as RunWithRelations | null;
+}
+
+// ---------- Cross-volume run relationships ----------
+// Manual/user-driven, not derived — see "Relationship model" in
+// docs/comicvine-and-runs.md. Storage convention: relationship reads as
+// "source [relationship] target" from the older/first-linked run's point
+// of view (e.g. source=continuation=>target means target continues
+// source); the run detail page picks display labels for each direction.
+
+/** Runs matching `query` by name, for the "link this run to…" picker —
+ * excludes the run being linked (self-relationships are also blocked by a
+ * DB check constraint, but filtering here keeps it out of the results at
+ * all rather than letting the user pick it and hit an error). */
+export async function searchRunsForLinking(query: string, excludeRunId: string): Promise<Run[]> {
+  const q = query.trim();
+  if (!q) return [];
+  return unwrap(
+    await supabase
+      .from("runs")
+      .select("*")
+      .ilike("name", `%${q}%`)
+      .neq("id", excludeRunId)
+      .limit(10),
+    "Failed to search runs",
+  );
+}
+
+export async function createRunRelationship(
+  sourceRunId: string,
+  targetRunId: string,
+  relationship: RelationshipType,
+): Promise<void> {
+  const { error } = await supabase
+    .from("run_relationships")
+    .insert({ source_run_id: sourceRunId, target_run_id: targetRunId, relationship });
+  // 23505: this exact (source, target, relationship) triple is already
+  // linked — not an error from the caller's point of view, same pattern as
+  // list_items' duplicate-add handling.
+  if (error && error.code !== "23505") {
+    throw new ServiceError("Failed to link runs", { cause: error });
+  }
+}
+
+export async function deleteRunRelationship(id: string): Promise<void> {
+  const { error } = await supabase.from("run_relationships").delete().eq("id", id);
+  if (error) {
+    throw new ServiceError("Failed to remove run relationship", { cause: error });
+  }
 }

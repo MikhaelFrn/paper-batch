@@ -171,7 +171,18 @@ function SearchPage() {
             <div className="flex flex-wrap gap-2">{data.series.map((s) => <Card key={s.id} className="border-border/60"><CardContent className="p-3 text-sm">{s.name}</CardContent></Card>)}</div>
           </Group>
           <Group title="Runs" count={data.runs.length}>
-            <div className="flex flex-wrap gap-2">{data.runs.map((r) => <span key={r.id} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm">{r.name}</span>)}</div>
+            <div className="flex flex-wrap gap-2">
+              {data.runs.map((r) => (
+                <Link
+                  key={r.id}
+                  to="/runs/$id"
+                  params={{ id: r.id }}
+                  className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm hover:border-primary/40"
+                >
+                  {r.name}
+                </Link>
+              ))}
+            </div>
           </Group>
           <Group title="Volumes" count={data.volumes.length + cvVolumesOnly.length}>
             <div className="flex flex-wrap gap-2">

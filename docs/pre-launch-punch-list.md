@@ -94,13 +94,6 @@ before or around that point.
   (favorited creators have no stored role, so the split was fake) —
   merged into one "Creators" tab instead of two tabs pretending to differ.
 
-## Explicitly deferred feature work
-
-- **Cross-volume run continuation** (`run_relationships` —
-  `continuation` / `recommended_before` / `tie-in` typed links between
-  runs). The table exists in the schema already; nothing in the app reads
-  or writes it yet.
-
 ## Decided this session
 
 - **Co-writer "primary writer" rule**: keep first-listed credit. No code
@@ -148,18 +141,8 @@ before or around that point.
   via the generated `Enums<>` helper so a future regen never fights with
   hand edits again.
 
-## Found this session, deliberately left alone
-
-- `covers.issue_id` has no unique DB constraint — confirmed live no
-  duplicates exist yet, so safe to add:
-  `alter table covers add constraint covers_issue_id_key unique (issue_id);`
-  Not run yet — needs real SQL access this session doesn't have.
-
 ## Pre-launch hygiene not yet raised
 
-- No test suite exists anywhere in the repo. For logic as fiddly as run
-  derivation or search matching, even light regression coverage would
-  catch silent breakage from future edits.
 - Secrets audit: confirmed live (grepped every env var reference in
   `src`) that only `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`
   are client-exposed by design; `SUPABASE_SERVICE_ROLE_KEY` and
@@ -223,3 +206,54 @@ before or around that point.
   disclaimer paragraph already mentioned analyzing a range for large
   runs from the earlier `issueRange` work, so no change was needed
   there.
+- **Cross-volume run continuation** (`run_relationships`). The table
+  existed in the schema but nothing read or wrote it, and there was no
+  run detail page for it to live on at all — clicking a run anywhere
+  (volume page, comic page, search) went nowhere or landed on the parent
+  volume instead. Added a real `/runs/$id` page (issue grid + a "Related
+  runs" section) and wired every existing run mention to link there.
+  Linking two runs is manual, on purpose — matches
+  `docs/comicvine-and-runs.md`'s own framing that classifying
+  *continuation* vs *recommended_before* vs a tie-in is a judgment call,
+  not something a scoring formula should decide. The trickiest part was
+  `run_relationships` self-referencing `runs` twice (source and target);
+  PostgREST needs the FK constraint name (`fk_source_run`/
+  `fk_target_run`) to disambiguate which embed is which — verified live
+  against real data that outgoing/incoming resolve to the correct sides
+  before trusting it. Also noticed in passing that `useFavoriteRuns`/
+  `useToggleFavoriteRun` already existed but nothing called them — fixed
+  right after (see below).
+- **Favorite-run toggle + Favorites page "Runs" tab.** The hooks existed
+  but had no UI: no heart anywhere, no runs tab. Added a heart toggle on
+  the new run detail page (same pattern as the series/publisher toggles
+  on the comic page) and a "Runs" tab on Favorites linking through to it.
+  Deliberately didn't fold run-favorites into the "Comics" tab's
+  favorite-match logic (`src/lib/favorite-match.ts`) — that would need a
+  new issue↔run join that isn't there yet, and wasn't part of this ask.
+- **`covers.issue_id` unique constraint** — turned out to already be live
+  (`ADD CONSTRAINT covers_issue_id_key UNIQUE (issue_id)` in
+  `supabase/migrations/20260810042433_remote_schema.sql:197`), applied
+  sometime after the "safe to add, not run yet" note was written but
+  before that note got updated. Doc was stale, not the DB.
+- **Unit test suite** — none existed anywhere in the repo. Added Vitest
+  (`vitest.config.ts`, separate from `vite.config.ts` on purpose — that
+  one goes through the Lovable/TanStack Start/Nitro wrapper, irrelevant
+  and unsafe to drag into plain unit tests) plus `tests/unit/`, covering
+  the logic that's genuinely fiddly and already caused real bugs this
+  session: `deriveRunSegments` (gap-merging, noise absorption, anthology
+  collapse, ongoing-forcing), the range-analysis math added for
+  `analyzeVolume` (`issueDateKey`/`parseIssueNumberForRange`/
+  `filterIssuesByRange`/`computeRangeTouchesLatest` — the last two didn't
+  exist as testable units before this; they were inline logic in
+  `analyzeVolume`'s handler, pulled out into named exported functions
+  specifically so this session's earlier "5 synthetic test cases" hand
+  check could become permanent instead of a one-off), both
+  `normalizeSeriesName` implementations (including a regression guard
+  that they *stay* different on annuals — that divergence is
+  intentional, not a bug waiting to be "fixed"), and `isFavoriteIssue`.
+  40 tests, all passing (`npm test`). Deliberately skipped a cover-hash
+  test: the only home-grown logic there is a thin wrapper around Jimp's
+  own `compareHashes`, nothing pure enough to be worth mocking Jimp for.
+  Scope is intentionally narrow — pure functions only, no DOM, no live
+  Supabase/ComicVine calls; e2e/integration testing is a separate,
+  bigger lift not attempted here.

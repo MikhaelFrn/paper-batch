@@ -40,6 +40,8 @@ export const queryKeys = {
     byIssue: (issueId: string) =>
       [...queryKeys.runs.all, "issue", issueId] as const,
     detail: (id: string) => [...queryKeys.runs.all, id] as const,
+    searchForLinking: (query: string, excludeRunId: string) =>
+      [...queryKeys.runs.all, "searchForLinking", excludeRunId, query] as const,
   },
   issues: {
     all: ["issues"] as const,

@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { BookOpen, CheckCheck, ListChecks, ListPlus, Sparkles, X } from "lucide-react";
@@ -415,7 +415,11 @@ function VolumeDetail() {
             {derivedRuns.map((run) => (
               <Card key={run.id} className="border-border/60">
                 <CardHeader className="flex-row items-center justify-between gap-2">
-                  <CardTitle className="font-display text-base tracking-wide">{run.name}</CardTitle>
+                  <Link to="/runs/$id" params={{ id: run.id }} className="min-w-0">
+                    <CardTitle className="font-display truncate text-base tracking-wide hover:underline">
+                      {run.name}
+                    </CardTitle>
+                  </Link>
                   <Badge variant={run.status === "verified" ? "default" : "outline"}>
                     {run.status}
                   </Badge>

@@ -5,10 +5,12 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ComicCard, PublisherBadge } from "@/components/comic-card";
+import { Badge } from "@/components/ui/badge";
 import {
   useFavoriteSeries,
   useFavoritePublishers,
   useFavoriteCreators,
+  useFavoriteRuns,
 } from "@/hooks/useFavorites";
 import { useUserCollection } from "@/hooks/useUserComics";
 import { userComicToComic } from "@/lib/comic-adapters";
@@ -30,6 +32,7 @@ function Favorites() {
   const favSeries = useFavoriteSeries();
   const favPublishers = useFavoritePublishers();
   const favCreators = useFavoriteCreators();
+  const favRuns = useFavoriteRuns();
   const collection = useUserCollection();
 
   const favoriteIds = useMemo(
@@ -58,6 +61,7 @@ function Favorites() {
           <TabsTrigger value="series">Series</TabsTrigger>
           <TabsTrigger value="publishers">Publishers</TabsTrigger>
           <TabsTrigger value="creators">Creators</TabsTrigger>
+          <TabsTrigger value="runs">Runs</TabsTrigger>
           <TabsTrigger value="comics">Comics</TabsTrigger>
         </TabsList>
 
@@ -90,6 +94,26 @@ function Favorites() {
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {(favCreators.data ?? []).map((c) => (
               <Card key={c.id} className="border-border/60"><CardContent className="p-4">{[c.first_name, c.last_name].filter(Boolean).join(" ")}</CardContent></Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="runs" className="mt-6">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {(favRuns.data ?? []).map((r) => (
+              <Link key={r.id} to="/runs/$id" params={{ id: r.id }}>
+                <Card className="cursor-pointer border-border/60 transition hover:border-primary/40">
+                  <CardHeader className="flex-row items-center justify-between gap-3">
+                    <span className="flex min-w-0 items-center gap-3">
+                      <Heart className="h-5 w-5 shrink-0 fill-primary text-primary" />
+                      <CardTitle className="font-display truncate text-lg tracking-wide">{r.name}</CardTitle>
+                    </span>
+                    <Badge variant={r.status === "verified" ? "default" : "outline"} className="shrink-0">
+                      {r.status}
+                    </Badge>
+                  </CardHeader>
+                </Card>
+              </Link>
             ))}
           </div>
         </TabsContent>

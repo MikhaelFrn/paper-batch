@@ -98,7 +98,7 @@ export const getNewArrivals = createServerFn({ method: "GET" }).handler(
 // actually just named "Annual" with nothing else wouldn't match.
 const ANNUAL_SUFFIX = /\s+(annual|special|one-shot|one shot|giant-size|giant size)s?(\s*#?\d+)?$/i;
 
-function normalizeSeriesName(name: string): string {
+export function normalizeSeriesName(name: string): string {
   return name
     .toLowerCase()
     .replace(/^the\s+/, "")

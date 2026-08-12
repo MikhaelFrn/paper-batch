@@ -501,8 +501,8 @@ function ComicDetail() {
                 {issueRuns.map((run) => (
                   <Link
                     key={run.id}
-                    to="/volumes/$id"
-                    params={{ id: volumeId ?? "" }}
+                    to="/runs/$id"
+                    params={{ id: run.id }}
                     className="flex items-center justify-between gap-2 rounded-lg border border-border/60 p-3 text-sm hover:border-primary/40"
                   >
                     <span className="flex items-center gap-2 truncate">
