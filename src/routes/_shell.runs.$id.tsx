@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Heart, Link2, Waypoints, X } from "lucide-react";
+import { Heart, Library, Link2, ShieldCheck, Waypoints, X } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { ComicCard } from "@/components/comic-card";
 import { Button } from "@/components/ui/button";
@@ -28,9 +28,12 @@ import {
   useCreateRunRelationship,
   useDeleteRunRelationship,
   useRun,
+  useRunVerifications,
   useSearchRunsForLinking,
+  useToggleRunVerification,
 } from "@/hooks/useRuns";
 import { useFavoriteRuns, useToggleFavoriteRun } from "@/hooks/useFavorites";
+import { useCurrentUser } from "@/hooks/useAuth";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { issueToComic } from "@/lib/comic-adapters";
 import { cn } from "@/lib/utils";
@@ -160,6 +163,9 @@ function RunDetail() {
   const deleteRelationship = useDeleteRunRelationship();
   const favoriteRuns = useFavoriteRuns();
   const toggleFavoriteRun = useToggleFavoriteRun();
+  const currentUser = useCurrentUser();
+  const verifications = useRunVerifications(id);
+  const toggleVerification = useToggleRunVerification();
 
   if (runQ.isLoading) {
     return <p className="text-sm text-muted-foreground">{t.runDetail.loadingRun}</p>;
@@ -177,10 +183,25 @@ function RunDetail() {
     );
   };
 
+  const verifiedByMe = (verifications.data ?? []).some((v) => v.user_id === currentUser.data?.id);
+  const verifiedCount = (verifications.data ?? []).length;
+  const handleToggleVerify = () => {
+    toggleVerification.mutate(
+      { runId: run.id, isVerified: verifiedByMe },
+      { onError: () => toast.error(t.runDetail.updateVerifyFailed) },
+    );
+  };
+
   const writers = run.run_creators
     .map((rc) => [rc.creator?.first_name, rc.creator?.last_name].filter(Boolean).join(" "))
     .filter(Boolean)
     .join(", ");
+
+  // Every run_item belongs to the same volume by construction — this is
+  // otherwise the only page in the app with no way back to it. Without
+  // this, a run reached via search/favorites/a comic's credit link is a
+  // dead end: nothing here led back to the volume's analyze/rescan page.
+  const volume = run.run_items.find((ri) => ri.issue?.volume)?.issue?.volume;
 
   const relatedRuns = [
     ...run.outgoing_relationships.map((rel) => ({
@@ -217,6 +238,14 @@ function RunDetail() {
         description={`${t.common.issuesCount(run.run_items.length)} · ${t.volumeDetail.confidence(Math.round((run.confidence ?? 0) * 100))}${writers ? ` · ${writers}` : ""}`}
         actions={
           <>
+            {volume && (
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/volumes/$id" params={{ id: volume.id }}>
+                  <Library className="h-4 w-4" />
+                  {t.runDetail.viewVolume(volume.name)}
+                </Link>
+              </Button>
+            )}
             <Button
               variant={isFavorite ? "default" : "outline"}
               size="sm"
@@ -225,6 +254,17 @@ function RunDetail() {
             >
               <Heart className={cn("h-4 w-4", isFavorite && "fill-current")} />
               {isFavorite ? t.runDetail.favorited : t.runDetail.favorite}
+            </Button>
+            <Button
+              variant={verifiedByMe ? "default" : "outline"}
+              size="sm"
+              onClick={handleToggleVerify}
+              disabled={toggleVerification.isPending}
+              title={verifiedCount > 0 ? t.runDetail.verifiedByCount(verifiedCount) : undefined}
+            >
+              <ShieldCheck className="h-4 w-4" />
+              {verifiedByMe ? t.runDetail.verifiedByYou : t.runDetail.verifyThisRun}
+              {verifiedCount > 0 && ` (${verifiedCount})`}
             </Button>
             <Badge variant={run.status === "verified" ? "default" : "outline"}>
               {run.status === "verified" ? t.common.runStatus.verified : t.common.runStatus.draft}

@@ -10,9 +10,8 @@ import type {
 } from "@/lib/types";
 import { unwrap } from "./_utils";
 import { backfillCoverHashes } from "./coverHash";
+import { ISSUE_WITH_RELATIONS } from "./issues";
 
-const ISSUE_WITH_RELATIONS =
-  "*, volume:volumes(*, series:series(*, publisher:publishers(*))), issue_creators(role, creator:creators(*))" as const;
 // `!inner` on volume/series, not the default left-outer embed — filtering
 // on an embedded resource's column only constrains which *parent* rows
 // come back when the join is forced inner (confirmed live: without

@@ -17,7 +17,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
         type="button"
         onClick={() => setLocale("en")}
         aria-pressed={locale === "en"}
-        aria-label={t.common.english}
+        aria-label={`EN — ${t.common.english}`}
         className={cn(
           "rounded px-2 py-1 font-medium transition-colors",
           locale === "en" ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:text-foreground",
@@ -29,7 +29,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
         type="button"
         onClick={() => setLocale("fr")}
         aria-pressed={locale === "fr"}
-        aria-label={t.common.french}
+        aria-label={`FR — ${t.common.french}`}
         className={cn(
           "rounded px-2 py-1 font-medium transition-colors",
           locale === "fr" ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:text-foreground",

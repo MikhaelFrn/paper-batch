@@ -1,25 +1,34 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { BookOpen, CheckCheck, ListChecks, ListPlus, Sparkles, X } from "lucide-react";
+import { BookOpen, CheckCheck, ListChecks, Sparkles, X } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { ComicCard } from "@/components/comic-card";
+import { ComicGrid } from "@/components/comic-grid";
+import { CenteredMessage } from "@/components/state-blocks";
+import { AddToListMenu } from "@/components/add-to-list-menu";
+import { ComicVineAttribution } from "@/components/comicvine-attribution";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useVolume } from "@/hooks/useVolumes";
 import { useIssuesByVolume } from "@/hooks/useIssues";
 import { useRunsForVolume, useAnalyzeVolume } from "@/hooks/useRuns";
 import { useBulkSetOwned, useBulkSetRead, useUserCollection } from "@/hooks/useUserComics";
-import { useBulkAddIssuesToList, useMyLists } from "@/hooks/useLists";
+import { useBulkAddIssuesToList } from "@/hooks/useLists";
 import { issueToComic } from "@/lib/comic-adapters";
 import { getKnownSafeErrorKind } from "@/lib/rate-limit-messages";
 import { useTranslation } from "@/i18n";
@@ -79,11 +88,12 @@ function AnalyzeButton({
   const [rangeTo, setRangeTo] = useState("");
 
   const isPendingRange = analyze.isPending && !!analyze.variables?.issueRange;
-  const isPendingWhole = analyze.isPending && !analyze.variables?.issueRange;
+  const isPendingRescan = analyze.isPending && !!analyze.variables?.fullRescan;
+  const isPendingWhole = analyze.isPending && !analyze.variables?.issueRange && !analyze.variables?.fullRescan;
 
-  const runAnalyze = (issueRange?: { from: number; to: number }) => {
+  const runAnalyze = (issueRange?: { from: number; to: number }, fullRescan?: boolean) => {
     analyze.mutate(
-      { volumeDetailUrl: detailUrl, issueRange },
+      { volumeDetailUrl: detailUrl, issueRange, fullRescan },
       {
         onSuccess: (result) => {
           if (result.alreadyAnalyzed) {
@@ -131,6 +141,27 @@ function AnalyzeButton({
         <Button variant="ghost" size="sm" onClick={() => setRangeMode((v) => !v)} disabled={analyze.isPending}>
           {rangeMode ? t.volumeDetail.cancelRange : t.volumeDetail.analyzeARangeInstead}
         </Button>
+        {hasExistingRuns && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="sm" disabled={analyze.isPending}>
+                {isPendingRescan ? t.volumeDetail.analyzing : t.volumeDetail.fullRescan}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t.volumeDetail.fullRescanConfirmTitle}</AlertDialogTitle>
+                <AlertDialogDescription>{t.volumeDetail.fullRescanConfirmDescription}</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
+                <AlertDialogAction onClick={() => runAnalyze(undefined, true)}>
+                  {t.volumeDetail.fullRescan}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
       {analyze.isPending && (
         <p className="text-xs text-muted-foreground">
@@ -163,12 +194,10 @@ function AnalyzeButton({
   );
 }
 
-/** Same "add to list" dropdown as the comic detail page's AddToListMenu,
- * just bulk — lets a selection go straight to e.g. a wishlist without
- * also being marked owned or read (the actual point: #2-9 of something
- * you're missing shouldn't get flagged as owned just because you selected
- * them). Viewer-role lists are excluded, same reasoning as the single-issue
- * version — collaborators there can see but not add. */
+/** Bulk version of the comic detail page's add-to-list menu — lets a
+ * selection go straight to e.g. a wishlist without also being marked owned
+ * or read (the actual point: #2-9 of something you're missing shouldn't
+ * get flagged as owned just because you selected them). */
 function BulkAddToListMenu({
   issueIds,
   onAdded,
@@ -177,42 +206,28 @@ function BulkAddToListMenu({
   onAdded: () => void;
 }) {
   const { t } = useTranslation();
-  const lists = useMyLists();
   const bulkAddToList = useBulkAddIssuesToList();
-  const addableLists = (lists.data ?? []).filter((l) => l.myRole !== "viewer");
-
-  const handleAdd = (listId: string, listName: string) => {
-    bulkAddToList.mutate(
-      { listId, issueIds },
-      {
-        onSuccess: () => {
-          toast.success(t.volumeDetail.addedIssuesToList(issueIds.length, listName));
-          onAdded();
-        },
-        onError: () => toast.error(t.volumeDetail.addToListFailed(listName)),
-      },
-    );
-  };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" disabled={issueIds.length === 0 || bulkAddToList.isPending}>
-          <ListPlus className="h-4 w-4" />{t.volumeDetail.addToList}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
-        {addableLists.length === 0 ? (
-          <DropdownMenuItem disabled>{t.volumeDetail.noListsYet}</DropdownMenuItem>
-        ) : (
-          addableLists.map((l) => (
-            <DropdownMenuItem key={l.id} onClick={() => handleAdd(l.id, l.name)}>
-              {l.name}
-            </DropdownMenuItem>
-          ))
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <AddToListMenu
+      issueIds={issueIds}
+      isPending={bulkAddToList.isPending}
+      size="sm"
+      addToListLabel={t.volumeDetail.addToList}
+      noListsYetLabel={t.volumeDetail.noListsYet}
+      onAdd={(listId, listName) =>
+        bulkAddToList.mutate(
+          { listId, issueIds },
+          {
+            onSuccess: () => {
+              toast.success(t.volumeDetail.addedIssuesToList(issueIds.length, listName));
+              onAdded();
+            },
+            onError: () => toast.error(t.volumeDetail.addToListFailed(listName)),
+          },
+        )
+      }
+    />
   );
 }
 
@@ -310,7 +325,7 @@ function VolumeDetail() {
 
   if (isCvOnly) {
     if (cvId === null || Number.isNaN(cvId)) {
-      return <div className="py-20 text-center text-sm text-muted-foreground">{t.volumeDetail.invalidVolume}</div>;
+      return <CenteredMessage message={t.volumeDetail.invalidVolume} />;
     }
     return (
       <div>
@@ -326,10 +341,10 @@ function VolumeDetail() {
   }
 
   if (volume.isLoading) {
-    return <div className="py-20 text-center text-sm text-muted-foreground">{t.volumeDetail.loading}</div>;
+    return <CenteredMessage message={t.volumeDetail.loading} />;
   }
   if (!volume.data) {
-    return <div className="py-20 text-center text-sm text-muted-foreground">{t.volumeDetail.volumeNotFound}</div>;
+    return <CenteredMessage message={t.volumeDetail.volumeNotFound} />;
   }
 
   const data = volume.data;
@@ -491,7 +506,7 @@ function VolumeDetail() {
         {volumeIssues.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t.volumeDetail.noIssuesYet}</p>
         ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+          <ComicGrid>
             {volumeIssues.map((issue) => (
               <div key={issue.id} className="relative">
                 <ComicCard comic={issueToComic(issue, { owned: ownedIds.has(issue.id) })} />
@@ -505,9 +520,11 @@ function VolumeDetail() {
                 )}
               </div>
             ))}
-          </div>
+          </ComicGrid>
         )}
       </section>
+
+      <ComicVineAttribution />
     </div>
   );
 }

@@ -72,7 +72,7 @@ function ResetPassword() {
       title={t.auth.resetPassword.title}
       subtitle={t.auth.resetPassword.subtitle}
       footer={
-        <Link to="/login" className="text-primary hover:underline">
+        <Link to="/login" className="text-marvel hover:underline">
           {t.auth.resetPassword.backToSignIn}
         </Link>
       }

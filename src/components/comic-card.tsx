@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Bookmark, BookOpen, Heart, Star } from "lucide-react";
+import { Bookmark, Heart, Star } from "lucide-react";
 import { toast } from "sonner";
 import { ComicCover } from "./comic-cover";
 import { Badge } from "@/components/ui/badge";
@@ -186,6 +186,3 @@ export function RatingStars({ value }: { value?: number }) {
   );
 }
 
-export function ReadIcon() {
-  return <BookOpen className="h-3.5 w-3.5" />;
-}

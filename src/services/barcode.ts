@@ -1,16 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { lookupUpc } from "@/integrations/upcitemdb/client";
-import { getSupabaseServerClient } from "@/integrations/supabase/server-client";
 import { getSupabaseServiceClient } from "@/integrations/supabase/service-client";
 import { ServiceError } from "@/lib/types";
-
-async function requireAuthenticatedUser(): Promise<void> {
-  const supabase = getSupabaseServerClient();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) {
-    throw new ServiceError("Not authenticated", { code: "UNAUTHENTICATED" });
-  }
-}
+import { requireAuthenticatedUser } from "./_serverUtils";
 
 function normalizeUpc(raw: string): string {
   return raw.replace(/\D/g, "");

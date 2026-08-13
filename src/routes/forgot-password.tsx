@@ -45,7 +45,7 @@ function Forgot() {
       title={t.auth.forgotPassword.title}
       subtitle={t.auth.forgotPassword.subtitle}
       footer={
-        <Link to="/login" className="text-primary hover:underline">
+        <Link to="/login" className="text-marvel hover:underline">
           {t.auth.forgotPassword.backToSignIn}
         </Link>
       }

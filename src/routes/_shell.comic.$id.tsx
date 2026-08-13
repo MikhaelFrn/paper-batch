@@ -1,17 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Bookmark, BookOpen, Heart, ListPlus, Plus, Star, Waypoints } from "lucide-react";
+import { Bookmark, BookOpen, Heart, Star, Waypoints } from "lucide-react";
 import { ComicCard, PublisherBadge, RatingStars } from "@/components/comic-card";
 import { ComicCover } from "@/components/comic-cover";
+import { ComicGrid } from "@/components/comic-grid";
+import { CenteredMessage, NotFoundState } from "@/components/state-blocks";
+import { AddToListMenu } from "@/components/add-to-list-menu";
+import { ComicVineAttribution } from "@/components/comicvine-attribution";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -148,48 +145,28 @@ function CreatorLinks({
 }
 
 /** Every other list besides the default wishlist — that one already has its
- * own quick button. Viewer-only collaborators are excluded since they can
- * see but not add to a shared list (owners/editors only, enforced by RLS
- * regardless, but no point offering an action that'll just fail). */
-function AddToListMenu({ issueId }: { issueId: string }) {
+ * own quick button. */
+function AddToListMenuForIssue({ issueId }: { issueId: string }) {
   const { t } = useTranslation();
-  const lists = useMyLists();
   const addToList = useAddIssueToList();
-  const addableLists = (lists.data ?? []).filter((l) => l.myRole !== "viewer");
-
-  const handleAdd = (listId: string, listName: string) => {
-    addToList.mutate(
-      { listId, issueId },
-      {
-        onSuccess: () => toast.success(t.comicDetail.addedToList(listName)),
-        onError: () => toast.error(t.comicDetail.addToListFailed(listName)),
-      },
-    );
-  };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" disabled={addToList.isPending}>
-          <ListPlus className="h-4 w-4" />{t.comicDetail.addToList}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
-        {addableLists.length === 0 ? (
-          <DropdownMenuItem disabled>{t.comicDetail.noListsYet}</DropdownMenuItem>
-        ) : (
-          addableLists.map((l) => (
-            <DropdownMenuItem key={l.id} onClick={() => handleAdd(l.id, l.name)}>
-              {l.name}
-            </DropdownMenuItem>
-          ))
-        )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to="/lists"><Plus className="mr-2 h-4 w-4" />{t.comicDetail.newList}</Link>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <AddToListMenu
+      issueIds={[issueId]}
+      isPending={addToList.isPending}
+      addToListLabel={t.comicDetail.addToList}
+      noListsYetLabel={t.comicDetail.noListsYet}
+      newListLink={{ label: t.comicDetail.newList }}
+      onAdd={(listId, listName) =>
+        addToList.mutate(
+          { listId, issueId },
+          {
+            onSuccess: () => toast.success(t.comicDetail.addedToList(listName)),
+            onError: () => toast.error(t.comicDetail.addToListFailed(listName)),
+          },
+        )
+      }
+    />
   );
 }
 
@@ -219,15 +196,16 @@ function ComicDetail() {
   const [similarOwned, setSimilarOwned] = useState<Comic | null>(null);
 
   if (issueQ.isLoading) {
-    return <div className="py-20 text-center text-sm text-muted-foreground">{t.comicDetail.loading}</div>;
+    return <CenteredMessage message={t.comicDetail.loading} />;
   }
   if (!issueQ.data) {
     return (
-      <div className="py-20 text-center">
-        <div className="font-display text-4xl">{t.comicDetail.notFound}</div>
-        <p className="mt-2 text-muted-foreground">{t.comicDetail.notFoundDescription}</p>
-        <Link to="/inventory" className="mt-4 inline-block text-primary">{t.comicDetail.backToInventory}</Link>
-      </div>
+      <NotFoundState
+        title={t.comicDetail.notFound}
+        description={t.comicDetail.notFoundDescription}
+        backTo="/inventory"
+        backLabel={t.comicDetail.backToInventory}
+      />
     );
   }
 
@@ -417,7 +395,7 @@ function ComicDetail() {
                       ? t.comicDetail.inWishlist
                       : t.comicDetail.addToWishlist}
               </Button>
-              <AddToListMenu issueId={comic.id} />
+              <AddToListMenuForIssue issueId={comic.id} />
               <Button variant={comic.owned ? "default" : "secondary"} onClick={handleToggleOwned} disabled={upsertUserComic.isPending}>
                 {comic.owned ? t.comicDetail.ownedYes : t.comicDetail.markAsOwned}
               </Button>
@@ -532,17 +510,19 @@ function ComicDetail() {
 
         <section>
           <h2 className="font-display mb-4 text-xl tracking-wide">{t.comicDetail.related}</h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+          <ComicGrid>
             {related.map((c) => <ComicCard key={c.id} comic={c} />)}
-          </div>
+          </ComicGrid>
         </section>
 
         <section>
           <h2 className="font-display mb-4 text-xl tracking-wide">{t.comicDetail.youMightAlsoLike}</h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+          <ComicGrid>
             {recommended.map((c) => <ComicCard key={c.id} comic={c} />)}
-          </div>
+          </ComicGrid>
         </section>
+
+        <ComicVineAttribution />
       </div>
 
       <AlertDialog open={!!similarOwned} onOpenChange={(open) => { if (!open) setSimilarOwned(null); }}>

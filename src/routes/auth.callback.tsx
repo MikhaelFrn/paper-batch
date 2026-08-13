@@ -49,7 +49,7 @@ function AuthCallback() {
         <div>
           <div className="font-display text-2xl">{t.auth.callback.failedTitle}</div>
           <p className="mt-2 text-sm text-muted-foreground">{error_description ?? error}</p>
-          <Link to="/login" className="mt-4 inline-block text-primary hover:underline">
+          <Link to="/login" className="mt-4 inline-block text-marvel hover:underline">
             {t.auth.callback.backToLogin}
           </Link>
         </div>

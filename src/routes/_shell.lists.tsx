@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/state-blocks";
+import { ListFormFields } from "@/components/list-form-fields";
 import { useMyLists, useCreateList } from "@/hooks/useLists";
 import type { ListType, ListVisibility } from "@/lib/types";
 import { useTranslation } from "@/i18n";
@@ -18,17 +20,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/_shell/lists")({
   head: () => ({
@@ -108,41 +99,19 @@ function NewListDialog() {
           <DialogTitle>{t.lists.createDialogTitle}</DialogTitle>
           <DialogDescription>{t.lists.createDialogDescription}</DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="new-list-name">{t.lists.nameLabel}</Label>
-            <Input
-              id="new-list-name"
-              placeholder={t.lists.namePlaceholder}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-          <div>
-            <Label htmlFor="new-list-description">{t.lists.descriptionLabel}</Label>
-            <Textarea
-              id="new-list-description"
-              placeholder={t.lists.descriptionPlaceholder}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </div>
-          <div>
-            <Label htmlFor="new-list-type">{t.lists.typeLabel}</Label>
-            <Select value={type} onValueChange={(v) => setType(v as ListType)}>
-              <SelectTrigger id="new-list-type"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="custom">{t.lists.typeCustom}</SelectItem>
-                <SelectItem value="wishlist">{t.lists.typeWishlist}</SelectItem>
-                <SelectItem value="reading">{t.lists.typeReading}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="new-list-public">{t.lists.publicLabel}</Label>
-            <Switch id="new-list-public" checked={isPublic} onCheckedChange={setIsPublic} />
-          </div>
-        </div>
+        <ListFormFields
+          idPrefix="new-list"
+          name={name}
+          onNameChange={setName}
+          namePlaceholder={t.lists.namePlaceholder}
+          description={description}
+          onDescriptionChange={setDescription}
+          descriptionPlaceholder={t.lists.descriptionPlaceholder}
+          isPublic={isPublic}
+          onPublicChange={setIsPublic}
+          type={type}
+          onTypeChange={setType}
+        />
         <DialogFooter>
           <Button onClick={handleCreate} disabled={createList.isPending}>
             {createList.isPending ? t.lists.creating : t.lists.createList}
@@ -180,11 +149,7 @@ function Lists() {
       {lists.isLoading ? (
         <div className="py-10 text-sm text-muted-foreground">{t.lists.loadingLists}</div>
       ) : rows.length === 0 ? (
-        <div className="grid place-items-center rounded-xl border border-dashed border-border py-20 text-center">
-          <ListChecks className="mb-3 h-8 w-8 text-muted-foreground" />
-          <div className="font-medium">{t.lists.noListsYet}</div>
-          <div className="text-sm text-muted-foreground">{t.lists.noListsDescription}</div>
-        </div>
+        <EmptyState icon={ListChecks} title={t.lists.noListsYet} description={t.lists.noListsDescription} />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {rows.map((list) => {

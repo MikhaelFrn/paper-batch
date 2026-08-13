@@ -31,7 +31,7 @@ export function AuthShell({ title, subtitle, children, footer }: { title: string
           </div>
         </div>
       </div>
-      <div className="flex items-center justify-center px-6 py-12">
+      <main className="flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
           <Link to="/" className="mb-8 flex items-center gap-2 lg:hidden">
             <div className="grid h-9 w-9 place-items-center rounded-md bg-primary"><Zap className="h-4 w-4 text-primary-foreground" /></div>
@@ -49,7 +49,7 @@ export function AuthShell({ title, subtitle, children, footer }: { title: string
             {t.common.contact}
           </a>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

@@ -20,6 +20,7 @@ export const fr: typeof en = {
     runStatus: { draft: "brouillon", verified: "vérifié" },
     issuesCount: (n) => `${n} numéro${n === 1 ? "" : "s"}`,
     selectedCount: (n) => `${n} sélectionné${n === 1 ? "" : "s"}`,
+    comicVineAttribution: "Données et images de couverture fournies par ComicVine.",
   },
   errors: {
     upcitemdbQuota:
@@ -293,6 +294,10 @@ export const fr: typeof en = {
     analyzing: "Analyse en cours…",
     recheckForNewRuns: "Revérifier pour de nouveaux runs",
     analyzeThisVolumeButton: "Analyser ce volume",
+    fullRescan: "Réanalyse complète",
+    fullRescanConfirmTitle: "Réanalyser complètement ce volume?",
+    fullRescanConfirmDescription:
+      "Supprime tous les runs actuellement dérivés pour ce volume et les redérive tous à partir de zéro. Cela retire aussi les favoris ou vérifications de qui que ce soit sur ces runs, ainsi que tout lien vers des runs d'autres volumes. Cette action est irréversible.",
     cancelRange: "Annuler la plage",
     analyzeARangeInstead: "Analyser une plage plutôt",
     analyzePending:
@@ -333,9 +338,14 @@ export const fr: typeof en = {
   runDetail: {
     loadingRun: "Chargement du run…",
     runNotFound: "Run introuvable.",
+    viewVolume: (name) => `Voir ${name}`,
     favorited: "Ajouté aux favoris",
     favorite: "Favori",
     updateFavoriteFailed: "Impossible de mettre à jour le favori.",
+    verifyThisRun: "Vérifier cette suite",
+    verifiedByYou: "Vérifiée par vous",
+    verifiedByCount: (n) => `Vérifiée par ${n} ${n === 1 ? "personne" : "personnes"}`,
+    updateVerifyFailed: "Impossible de mettre à jour la vérification.",
     relatedRuns: "Runs liés",
     linkToAnotherRun: "Lier à un autre run",
     linkDialogDescription:
@@ -397,9 +407,11 @@ export const fr: typeof en = {
     noListsDescription: "Créez-en une, ou ajoutez une BD à votre liste de souhaits depuis sa page de détails.",
     listNotFound: "Cette liste n'existe pas, ou n'est pas la vôtre.",
     backToLists: "Retour aux listes",
+    ownedBy: (name) => `Appartient à ${name}`,
     collaborators: "Collaborateurs",
     collaboratorsDialogDescription:
       "Les éditeurs peuvent ajouter des BD à cette liste. Ils ne peuvent rien retirer — seulement vous.",
+    collaboratorsDialogDescriptionReadOnly: "Toutes les personnes ayant accès à cette liste.",
     addByUsername: "Ajouter par nom d'utilisateur",
     searchUsernamePlaceholder: "Rechercher un nom d'utilisateur…",
     currentMembers: "Membres actuels",
@@ -507,7 +519,6 @@ export const fr: typeof en = {
     coverTitle: "Image de couverture",
     coverDescription:
       "Compare une photo aux couvertures connues par empreinte d'image. Téléversement seulement — une caméra en direct instable ne vaut pas les faux résultats.",
-    soon: "Bientôt",
     scanAComic: "Numériser une BD",
     addByBarcode: "Ajouter par code-barres",
     barcodePageDescription:

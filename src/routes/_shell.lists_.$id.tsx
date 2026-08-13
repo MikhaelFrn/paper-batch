@@ -1,14 +1,15 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { X, ListChecks, Pencil, Trash2, Users, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { ComicCard } from "@/components/comic-card";
+import { ComicGrid } from "@/components/comic-grid";
+import { EmptyState, CenteredMessage, NotFoundState } from "@/components/state-blocks";
+import { ListFormFields } from "@/components/list-form-fields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -57,13 +58,20 @@ export const Route = createFileRoute("/_shell/lists_/$id")({
 
 /** Owner-only: search-by-username + role pick to add, remove any non-owner
  * member. Collaborators can add comics to the list but never remove them —
- * enforced by RLS, not just hidden here. */
+ * enforced by RLS, not just hidden here.
+ *
+ * Openable by any member, not just the owner — otherwise a viewer/editor
+ * added to a list has no way to see who owns it or who else is on it. The
+ * add-by-username search and remove buttons stay owner-only; everyone else
+ * gets the same roster in read-only form. */
 function CollaboratorsDialog({
   listId,
   currentUserId,
+  isOwner,
 }: {
   listId: string;
   currentUserId: string | undefined;
+  isOwner: boolean;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -107,32 +115,36 @@ function CollaboratorsDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t.lists.collaborators}</DialogTitle>
-          <DialogDescription>{t.lists.collaboratorsDialogDescription}</DialogDescription>
+          <DialogDescription>
+            {isOwner ? t.lists.collaboratorsDialogDescription : t.lists.collaboratorsDialogDescriptionReadOnly}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          <div>
-            <Label htmlFor="collaborator-search">{t.lists.addByUsername}</Label>
-            <Input
-              id="collaborator-search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t.lists.searchUsernamePlaceholder}
-            />
-            {candidates.length > 0 && (
-              <div className="mt-2 space-y-2">
-                {candidates.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
-                    <span className="truncate">{p.display_name ?? p.username}</span>
-                    <div className="flex shrink-0 gap-1">
-                      <Button size="sm" variant="outline" disabled={addMember.isPending} onClick={() => handleAdd(p.id, "viewer")}>{t.lists.roleViewer}</Button>
-                      <Button size="sm" disabled={addMember.isPending} onClick={() => handleAdd(p.id, "editor")}>{t.lists.roleEditor}</Button>
+          {isOwner && (
+            <div>
+              <Label htmlFor="collaborator-search">{t.lists.addByUsername}</Label>
+              <Input
+                id="collaborator-search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t.lists.searchUsernamePlaceholder}
+              />
+              {candidates.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  {candidates.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
+                      <span className="truncate">{p.display_name ?? p.username}</span>
+                      <div className="flex shrink-0 gap-1">
+                        <Button size="sm" variant="outline" disabled={addMember.isPending} onClick={() => handleAdd(p.id, "viewer")}>{t.lists.roleViewer}</Button>
+                        <Button size="sm" disabled={addMember.isPending} onClick={() => handleAdd(p.id, "editor")}>{t.lists.roleEditor}</Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>{t.lists.currentMembers}</Label>
@@ -146,7 +158,7 @@ function CollaboratorsDialog({
                   <span className="text-xs uppercase tracking-wide text-muted-foreground">
                     {m.role === "editor" ? t.lists.roleEditor : m.role === "viewer" ? t.lists.roleViewer : m.role}
                   </span>
-                  {m.role !== "owner" && (
+                  {isOwner && m.role !== "owner" && (
                     <button
                       type="button"
                       onClick={() => handleRemove(m.user_id)}
@@ -185,15 +197,16 @@ function ListDetail() {
   const [isPublic, setIsPublic] = useState(false);
 
   if (list.isLoading) {
-    return <div className="py-20 text-center text-sm text-muted-foreground">{t.common.loading}</div>;
+    return <CenteredMessage message={t.common.loading} />;
   }
   if (!list.data) {
     return (
-      <div className="py-20 text-center">
-        <div className="font-display text-4xl">{t.common.notFound}</div>
-        <p className="mt-2 text-muted-foreground">{t.lists.listNotFound}</p>
-        <Link to="/lists" className="mt-4 inline-block text-primary">{t.lists.backToLists}</Link>
-      </div>
+      <NotFoundState
+        title={t.common.notFound}
+        description={t.lists.listNotFound}
+        backTo="/lists"
+        backLabel={t.lists.backToLists}
+      />
     );
   }
 
@@ -204,6 +217,7 @@ function ListDetail() {
 
   const isOwner = !!currentUser.data && data.owner_id === currentUser.data.id;
   const isMember = !!currentUser.data && (members.data ?? []).some((m) => m.user_id === currentUser.data!.id);
+  const ownerMember = (members.data ?? []).find((m) => m.role === "owner");
 
   const openEdit = () => {
     setName(data.name);
@@ -265,10 +279,17 @@ function ListDetail() {
       <PageHeader
         eyebrow={data.type === "custom" ? t.lists.customList : data.type === "wishlist" ? t.lists.wishlistType : t.lists.readingList}
         title={data.name}
-        description={data.description || t.lists.itemsCount(items.length)}
+        description={[
+          data.description || t.lists.itemsCount(items.length),
+          !isOwner && ownerMember
+            ? t.lists.ownedBy(ownerMember.profile?.display_name ?? ownerMember.profile?.username ?? t.lists.unknownUser)
+            : null,
+        ].filter(Boolean).join(" · ")}
         actions={
           <div className="flex gap-2">
-            {isOwner && <CollaboratorsDialog listId={data.id} currentUserId={currentUser.data?.id} />}
+            {(isOwner || isMember) && (
+              <CollaboratorsDialog listId={data.id} currentUserId={currentUser.data?.id} isOwner={isOwner} />
+            )}
             {isOwner && (
               <>
                 <Button variant="outline" size="sm" onClick={openEdit}><Pencil className="h-4 w-4" />{t.lists.edit}</Button>
@@ -301,13 +322,9 @@ function ListDetail() {
       />
 
       {items.length === 0 ? (
-        <div className="grid place-items-center rounded-xl border border-dashed border-border py-20 text-center">
-          <ListChecks className="mb-3 h-8 w-8 text-muted-foreground" />
-          <div className="font-medium">{t.lists.emptyListTitle}</div>
-          <div className="text-sm text-muted-foreground">{t.lists.emptyListDescription}</div>
-        </div>
+        <EmptyState icon={ListChecks} title={t.lists.emptyListTitle} description={t.lists.emptyListDescription} />
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+        <ComicGrid>
           {items.map(({ comic, issueId }) => (
             <div key={comic.id} className="group relative">
               <ComicCard comic={comic} />
@@ -324,7 +341,7 @@ function ListDetail() {
               )}
             </div>
           ))}
-        </div>
+        </ComicGrid>
       )}
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
@@ -332,24 +349,15 @@ function ListDetail() {
           <DialogHeader>
             <DialogTitle>{t.lists.editListTitle}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-list-name">{t.lists.nameLabel}</Label>
-              <Input id="edit-list-name" value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div>
-              <Label htmlFor="edit-list-description">{t.lists.descriptionLabel}</Label>
-              <Textarea
-                id="edit-list-description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="edit-list-public">{t.lists.publicLabel}</Label>
-              <Switch id="edit-list-public" checked={isPublic} onCheckedChange={setIsPublic} />
-            </div>
-          </div>
+          <ListFormFields
+            idPrefix="edit-list"
+            name={name}
+            onNameChange={setName}
+            description={description}
+            onDescriptionChange={setDescription}
+            isPublic={isPublic}
+            onPublicChange={setIsPublic}
+          />
           <DialogFooter>
             <Button onClick={handleSaveEdit} disabled={updateList.isPending}>
               {updateList.isPending ? t.lists.saving : t.lists.save}

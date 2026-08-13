@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ComicCard, PublisherBadge } from "@/components/comic-card";
+import { ComicGrid } from "@/components/comic-grid";
 import { Badge } from "@/components/ui/badge";
 import {
   useFavoriteSeries,
@@ -124,9 +125,9 @@ function Favorites() {
           <p className="mb-4 text-sm text-muted-foreground">
             {t.favorites.comicsDescription}
           </p>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+          <ComicGrid>
             {favComics.map((c) => <ComicCard key={c.id} comic={c} />)}
-          </div>
+          </ComicGrid>
         </TabsContent>
       </Tabs>
     </div>

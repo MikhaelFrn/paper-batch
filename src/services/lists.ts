@@ -9,9 +9,10 @@ import type {
   ListWithRole,
 } from "@/lib/types";
 import { requireUserId, unwrap, unwrapMaybe } from "./_utils";
+import { ISSUE_RELATIONS_FRAGMENT } from "./issues";
 
 const LIST_WITH_ITEMS =
-  "*, list_items(added_at, list_id, issue_id, issue:issues(*, volume:volumes(*, series:series(*, publisher:publishers(*))), issue_creators(role, creator:creators(*))))" as const;
+  `*, list_items(added_at, list_id, issue_id, issue:issues(*, ${ISSUE_RELATIONS_FRAGMENT}))` as const;
 
 /** Lists that belong to the current user's "My Lists" page: everything they
  * own, plus everything they were added to as a collaborator (viewer or

@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Barcode, ScanEye } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 import { useTranslation } from "@/i18n";
 
 export const Route = createFileRoute("/_shell/scan")({
@@ -20,7 +19,6 @@ interface ScanMode {
   icon: typeof Barcode;
   title: string;
   description: string;
-  soon?: boolean;
 }
 
 function ScanLanding() {
@@ -56,36 +54,17 @@ function ScanLanding() {
     <div>
       <PageHeader eyebrow={t.scan.landingEyebrow} title={t.scan.landingTitle} description={t.scan.landingDescription} />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {MODES.map((mode) => {
-          const cardContent = (
-            <Card
-              className={cn(
-                "h-full border-border/60 transition",
-                mode.soon ? "opacity-60" : "cursor-pointer hover:border-primary/40",
-              )}
-            >
+        {MODES.map((mode) => (
+          <Link key={mode.to} to={mode.to}>
+            <Card className="h-full cursor-pointer border-border/60 transition hover:border-primary/40">
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <mode.icon className="h-6 w-6 text-primary" />
-                  {mode.soon && (
-                    <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-                      {t.scan.soon}
-                    </span>
-                  )}
-                </div>
+                <mode.icon className="h-6 w-6 text-primary" />
                 <CardTitle className="mt-2 font-display tracking-wide">{mode.title}</CardTitle>
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground">{mode.description}</CardContent>
             </Card>
-          );
-          return mode.soon ? (
-            <div key={mode.to}>{cardContent}</div>
-          ) : (
-            <Link key={mode.to} to={mode.to}>
-              {cardContent}
-            </Link>
-          );
-        })}
+          </Link>
+        ))}
       </div>
     </div>
   );

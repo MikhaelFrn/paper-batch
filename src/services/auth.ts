@@ -74,11 +74,6 @@ export async function getCurrentUser(): Promise<User | null> {
   return data.user ?? null;
 }
 
-export async function getCurrentSession(): Promise<Session | null> {
-  const { data } = await supabase.auth.getSession();
-  return data.session ?? null;
-}
-
 export interface UpdateAuthUserParams {
   email?: string;
   password?: string;

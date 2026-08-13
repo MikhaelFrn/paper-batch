@@ -37,6 +37,7 @@ export type IssueCreator = Tables<"issue_creators">;
 export type RunCreator = Tables<"run_creators">;
 export type RunItem = Tables<"run_items">;
 export type RunRelationship = Tables<"run_relationships">;
+export type RunVerification = Tables<"run_verifications">;
 export type UserComic = Tables<"user_comics">;
 export type FavoriteSeries = Tables<"favorite_series">;
 export type FavoriteCreator = Tables<"favorite_creators">;

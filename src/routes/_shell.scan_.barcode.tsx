@@ -5,6 +5,8 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ComicCard } from "@/components/comic-card";
+import { ComicGrid } from "@/components/comic-grid";
+import { CenteredMessage } from "@/components/state-blocks";
 import { ImageDropZone } from "@/components/image-drop-zone";
 import { decodeBarcodeFromImage, useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { useCorrectBarcodeMatch, useLookupBarcode, useRecordBarcodeMatch } from "@/hooks/useBarcode";
@@ -83,11 +85,11 @@ function BarcodeQueryStep({
         </p>
         <Button variant="outline" size="sm" onClick={onRescan}><RotateCcw className="h-4 w-4" />{t.scan.scanAgain}</Button>
       </div>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+      <ComicGrid>
         {issues.map((cv) => (
           <ComicCard key={cv.id} comic={cvIssueToComic(cv)} onImported={onImported} />
         ))}
-      </div>
+      </ComicGrid>
     </div>
   );
 }
@@ -115,7 +117,7 @@ function CachedMatchStep({
   const issueQ = useIssue(issueId);
 
   if (issueQ.isLoading) {
-    return <div className="py-20 text-center text-sm text-muted-foreground">{t.common.loading}</div>;
+    return <CenteredMessage message={t.common.loading} />;
   }
 
   if (!issueQ.data) {

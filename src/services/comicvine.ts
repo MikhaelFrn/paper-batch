@@ -16,10 +16,10 @@ import type {
   CvSearchIssue,
   CvVolumeDetail,
 } from "@/integrations/comicvine/types";
-import { getSupabaseServerClient } from "@/integrations/supabase/server-client";
 import { getSupabaseServiceClient } from "@/integrations/supabase/service-client";
 import { ServiceError } from "@/lib/types";
 import { hashCoverImage } from "./coverHash";
+import { requireAuthenticatedUser } from "./_serverUtils";
 
 export type ComicVineSearchResults = ComicVineIssueSearchResult;
 
@@ -28,13 +28,6 @@ export type ComicVineSearchResults = ComicVineIssueSearchResult;
 // otherwise protect. Every function below hits the CV rate limit and the
 // import path bypasses RLS via the service-role client, so each checks the
 // caller's session itself rather than relying on _shell's route guard.
-async function requireAuthenticatedUser(): Promise<void> {
-  const supabase = getSupabaseServerClient();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) {
-    throw new ServiceError("Not authenticated", { code: "UNAUTHENTICATED" });
-  }
-}
 
 export const searchComicVine = createServerFn({ method: "GET" })
   .validator((query: string) => query)

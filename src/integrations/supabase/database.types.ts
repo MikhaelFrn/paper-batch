@@ -394,7 +394,13 @@ export type Database = {
         Relationships: [];
       };
       profiles: {
+        // avatar_object_key hand-added ahead of the migration being
+        // applied — regenerate via `supabase gen types` once
+        // 20260815000000_decouple_avatar_filename_from_user_id.sql has run,
+        // and this entry should come out identical (delete this comment
+        // once confirmed).
         Row: {
+          avatar_object_key: string | null;
           avatar_url: string | null;
           bio: string | null;
           created_at: string | null;
@@ -404,6 +410,7 @@ export type Database = {
           username: string | null;
         };
         Insert: {
+          avatar_object_key?: string | null;
           avatar_url?: string | null;
           bio?: string | null;
           created_at?: string | null;
@@ -413,6 +420,7 @@ export type Database = {
           username?: string | null;
         };
         Update: {
+          avatar_object_key?: string | null;
           avatar_url?: string | null;
           bio?: string | null;
           created_at?: string | null;
@@ -571,6 +579,36 @@ export type Database = {
           {
             foreignKeyName: "fk_target_run";
             columns: ["target_run_id"];
+            isOneToOne: false;
+            referencedRelation: "runs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      // Hand-added ahead of the migration being applied — regenerate via
+      // `supabase gen types` once `20260814000000_add_run_verifications.sql`
+      // has run, and this entry should come out identical (delete this
+      // comment once confirmed).
+      run_verifications: {
+        Row: {
+          run_id: string;
+          user_id: string;
+          verified_at: string | null;
+        };
+        Insert: {
+          run_id: string;
+          user_id: string;
+          verified_at?: string | null;
+        };
+        Update: {
+          run_id?: string;
+          user_id?: string;
+          verified_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "run_verifications_run_id_fkey";
+            columns: ["run_id"];
             isOneToOne: false;
             referencedRelation: "runs";
             referencedColumns: ["id"];

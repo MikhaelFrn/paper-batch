@@ -18,6 +18,7 @@ export const en = {
     runStatus: { draft: "draft", verified: "verified" },
     issuesCount: (n: number) => `${n} issue${n === 1 ? "" : "s"}`,
     selectedCount: (n: number) => `${n} selected`,
+    comicVineAttribution: "Comic and cover data provided by ComicVine.",
   },
   errors: {
     upcitemdbQuota:
@@ -289,6 +290,10 @@ export const en = {
     analyzing: "Analyzing…",
     recheckForNewRuns: "Re-check for new runs",
     analyzeThisVolumeButton: "Analyze this volume",
+    fullRescan: "Full rescan",
+    fullRescanConfirmTitle: "Full rescan this volume?",
+    fullRescanConfirmDescription:
+      "Deletes every run currently derived for this volume and re-derives all of them from scratch. This also removes anyone's favorites or verifications on those runs, and any links to runs in other volumes. This can't be undone.",
     cancelRange: "Cancel range",
     analyzeARangeInstead: "Analyze a range instead",
     analyzePending: "This can take a while — one ComicVine call for every issue that isn't already in your catalog. Hang tight.",
@@ -328,9 +333,14 @@ export const en = {
   runDetail: {
     loadingRun: "Loading run…",
     runNotFound: "Run not found.",
+    viewVolume: (name: string) => `View ${name}`,
     favorited: "Favorited",
     favorite: "Favorite",
     updateFavoriteFailed: "Couldn't update favorite.",
+    verifyThisRun: "Verify this run",
+    verifiedByYou: "Verified by you",
+    verifiedByCount: (n: number) => `Verified by ${n} ${n === 1 ? "person" : "people"}`,
+    updateVerifyFailed: "Couldn't update verification.",
     relatedRuns: "Related runs",
     linkToAnotherRun: "Link to another run",
     linkDialogDescription:
@@ -393,8 +403,10 @@ export const en = {
     // List detail page
     listNotFound: "That list doesn't exist, or isn't yours.",
     backToLists: "Back to lists",
+    ownedBy: (name: string) => `Owned by ${name}`,
     collaborators: "Collaborators",
     collaboratorsDialogDescription: "Editors can add comics to this list. They can't remove anything — only you can.",
+    collaboratorsDialogDescriptionReadOnly: "Everyone with access to this list.",
     addByUsername: "Add by username",
     searchUsernamePlaceholder: "Search username…",
     currentMembers: "Current members",
@@ -501,7 +513,6 @@ export const en = {
     coverTitle: "Cover image",
     coverDescription:
       "Matches a photo against known covers by image hash. Upload only — a shaky live camera isn't worth the false matches.",
-    soon: "Soon",
     // Barcode scan page
     scanAComic: "Scan a comic",
     addByBarcode: "Add by barcode",

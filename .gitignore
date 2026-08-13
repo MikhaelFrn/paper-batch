@@ -29,6 +29,9 @@ src/routeTree.gen.ts
 # Vercel
 .vercel
 
+# Lighthouse test reports — local performance/a11y snapshots, not build output
+tests/Lighthouse/
+
 # Legal draft — not ready for the repo until reviewed, see the file itself
 docs/legal-draft-privacy-and-terms.md
 docs/legal-draft-privacy-and-terms-fr.md
@@ -45,3 +48,4 @@ docs/legal-draft-privacy-and-terms-fr.md
 *.sw?
 .env
 
+.env*

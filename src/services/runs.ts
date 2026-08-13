@@ -6,7 +6,6 @@ import {
   getVolumeDetail,
 } from "@/integrations/comicvine/client";
 import type { CvIssueDetail, CvPersonCredit, CvSearchIssue } from "@/integrations/comicvine/types";
-import { getSupabaseServerClient } from "@/integrations/supabase/server-client";
 import { getSupabaseServiceClient } from "@/integrations/supabase/service-client";
 import {
   linkCreators,
@@ -25,9 +24,11 @@ import {
 import type { RelationshipType, Run, RunWithItems, RunWithRelations } from "@/lib/types";
 import { ServiceError } from "@/lib/types";
 import { unwrap } from "./_utils";
+import { requireAuthenticatedUser } from "./_serverUtils";
+import { ISSUE_RELATIONS_FRAGMENT } from "./issues";
 
 const RUN_WITH_ITEMS =
-  "*, run_items(position, issue:issues(*, volume:volumes(*, series:series(*, publisher:publishers(*))), issue_creators(role, creator:creators(*)))), run_creators(role, creator:creators(*))" as const;
+  `*, run_items(position, issue:issues(*, ${ISSUE_RELATIONS_FRAGMENT})), run_creators(role, creator:creators(*))` as const;
 
 // `run_relationships` self-references `runs` twice (source and target), so
 // each embed needs its FK constraint name to disambiguate which column
@@ -94,14 +95,6 @@ export async function listRunsForIssue(issueId: string): Promise<RunWithItems[]>
     "Failed to load runs",
   );
   return runs as unknown as RunWithItems[];
-}
-
-async function requireAuthenticatedUser(): Promise<void> {
-  const server = getSupabaseServerClient();
-  const { data, error } = await server.auth.getUser();
-  if (error || !data.user) {
-    throw new ServiceError("Not authenticated", { code: "UNAUTHENTICATED" });
-  }
 }
 
 // Only what run derivation actually reads off a "detail" — issue number,
@@ -263,6 +256,51 @@ async function createRunFromSegment(
   return run.id;
 }
 
+/** Appends newly-derived issues onto an already-existing run instead of
+ * creating a new one — used when a recheck finds new issues credited to
+ * the same writer already on the volume's most recent run, so #46-50
+ * showing up later reads as that run continuing, not a second disconnected
+ * run that happens to start with the same writer. */
+async function appendToRun(
+  client: ServiceClient,
+  run: RunWithItems,
+  segment: RunDerivationSegment,
+  issuesById: Map<string, ImportedIssue>,
+): Promise<void> {
+  const segmentIssues = segment.issueIds
+    .map((id) => issuesById.get(id))
+    .filter((x): x is ImportedIssue => !!x);
+  const last = segmentIssues[segmentIssues.length - 1];
+  const yearOf = (dateStr: string): number | null => {
+    const year = Number(dateStr.slice(0, 4));
+    return Number.isFinite(year) && year > 0 ? year : null;
+  };
+
+  const startPosition = run.run_items.length + 1;
+  const itemRows = segmentIssues.map((issue, index) => ({
+    run_id: run.id,
+    issue_id: issue.localIssueId,
+    position: startPosition + index,
+  }));
+  const { error: itemsError } = await client.from("run_items").insert(itemRows);
+  if (itemsError) {
+    throw new ServiceError("Failed to extend run", { cause: itemsError });
+  }
+
+  const { error: updateError } = await client
+    .from("runs")
+    .update({
+      end_year: last ? yearOf(issueDateKey(last.detail)) : run.end_year,
+      status: segment.status,
+      confidence: segment.confidence,
+      verified_at: segment.status === "verified" ? new Date().toISOString() : null,
+    })
+    .eq("id", run.id);
+  if (updateError) {
+    throw new ServiceError("Failed to update run", { cause: updateError });
+  }
+}
+
 export interface AnalyzeVolumeResult {
   volumeId: string;
   createdRuns: number;
@@ -328,13 +366,27 @@ export function computeRangeTouchesLatest(
  * (inclusive) instead of the full volume — the point being a 500-issue
  * run doesn't have to be analyzed all at once; #1-100 today and #101-200
  * next week both work, and each pass only pays for whatever wasn't
- * already known going in. A whole-volume request (no range) still
- * refuses to run a second time once any run exists, same as before —
- * that's what ranges are for. A ranged request is never blocked by
- * existing runs, since running the same or an overlapping range twice is
- * an explicit, deliberate choice at that point, not an accident. */
+ * already known going in.
+ *
+ * A whole-volume request (no range) with existing runs is a *recheck*, not
+ * a refusal: it diffs ComicVine's current issue list against what's already
+ * covered by a run_item and only processes genuinely new issues. If the
+ * first new segment shares a writer with the run covering the volume's
+ * most recent previously-known issue, it's appended onto that run
+ * (appendToRun) instead of starting a disconnected new one. Truly nothing
+ * new still reports `alreadyAnalyzed`.
+ *
+ * `fullRescan`, when true, deletes every existing run for the volume first
+ * (cascades to their run_items/run_creators, any run_relationships to
+ * other volumes, and anyone's favorite/verification of them — a real,
+ * user-facing cost, which is why the UI gates this behind its own
+ * confirmation, separate from the normal recheck) and re-derives from
+ * scratch, same as a first-ever analysis. */
 export const analyzeVolume = createServerFn({ method: "POST" })
-  .validator((input: { volumeDetailUrl: string; issueRange?: { from: number; to: number } }) => input)
+  .validator(
+    (input: { volumeDetailUrl: string; issueRange?: { from: number; to: number }; fullRescan?: boolean }) =>
+      input,
+  )
   .handler(async ({ data }): Promise<AnalyzeVolumeResult> => {
     await requireAuthenticatedUser();
     const client = getSupabaseServiceClient();
@@ -348,19 +400,53 @@ export const analyzeVolume = createServerFn({ method: "POST" })
     const seriesId = await resolveSeries(client, publisherId, volumeDetail.name);
     const volumeId = await upsertVolume(client, volumeDetail, seriesId, publisherId);
 
-    const existingRuns = await listRunsForVolume(volumeId, client);
-    if (!data.issueRange && existingRuns.length > 0) {
-      return {
-        volumeId,
-        createdRuns: 0,
-        totalIssues: existingRuns.reduce((sum, r) => sum + r.run_items.length, 0),
-        alreadyAnalyzed: true,
-        skippedKnownIssues: 0,
-      };
+    const runsBeforeRescan = await listRunsForVolume(volumeId, client);
+    if (data.fullRescan && runsBeforeRescan.length > 0) {
+      const { error } = await client
+        .from("runs")
+        .delete()
+        .in("id", runsBeforeRescan.map((r) => r.id));
+      if (error) {
+        throw new ServiceError("Failed to clear existing runs", { cause: error });
+      }
     }
+    const existingRuns = data.fullRescan ? [] : runsBeforeRescan;
 
     const allRawIssues = await getAllIssuesOfVolume(volumeDetail.id);
-    const rawIssues = filterIssuesByRange(allRawIssues, data.issueRange);
+
+    let rawIssues: CvSearchIssue[];
+    let appendTarget: RunWithItems | null = null;
+
+    if (data.issueRange) {
+      rawIssues = filterIssuesByRange(allRawIssues, data.issueRange);
+    } else if (existingRuns.length > 0) {
+      const coveredCvIds = new Set(
+        existingRuns.flatMap((r) =>
+          r.run_items.map((ri) => ri.issue?.comicvine_id).filter((id): id is number => id != null),
+        ),
+      );
+      rawIssues = allRawIssues.filter((i) => !coveredCvIds.has(i.id));
+      if (rawIssues.length === 0) {
+        return {
+          volumeId,
+          createdRuns: 0,
+          totalIssues: existingRuns.reduce((sum, r) => sum + r.run_items.length, 0),
+          alreadyAnalyzed: true,
+          skippedKnownIssues: 0,
+        };
+      }
+      const latestIssueDate = (run: RunWithItems) =>
+        run.run_items.reduce((max, ri) => {
+          const date = ri.issue?.release_date ?? "";
+          return date > max ? date : max;
+        }, "");
+      appendTarget = existingRuns.reduce((latest, r) =>
+        latestIssueDate(r) > latestIssueDate(latest) ? r : latest,
+      );
+    } else {
+      rawIssues = allRawIssues;
+    }
+
     if (rawIssues.length === 0) {
       return { volumeId, createdRuns: 0, totalIssues: 0, alreadyAnalyzed: false, skippedKnownIssues: 0 };
     }
@@ -391,16 +477,25 @@ export const analyzeVolume = createServerFn({ method: "POST" })
       return { issueId: localIssueId, writerKey: writer ? String(writer.id) : null };
     });
 
-    const rangeTouchesLatest = computeRangeTouchesLatest(allRawIssues, rawIssues, !!data.issueRange);
+    const isPartialPass = !!data.issueRange || !!appendTarget;
+    const rangeTouchesLatest = computeRangeTouchesLatest(allRawIssues, rawIssues, isPartialPass);
     const segments = deriveRunSegments(sequence, {
       isOngoing: rangeTouchesLatest && isVolumeOngoing(imported.map((i) => i.detail)),
     });
 
     let createdRuns = 0;
-    for (const segment of segments) {
+    for (const [index, segment] of segments.entries()) {
       if (segment.issueIds.length === 0) continue;
-      await createRunFromSegment(client, segment, volumeDetail.name, issuesById, writerNameByKey);
-      createdRuns++;
+      const targetWriterCvId = appendTarget?.run_creators.find((rc) => rc.role === "writer")?.creator?.comicvine_id;
+      const continuesTarget =
+        index === 0 && appendTarget && segment.writerKey != null && targetWriterCvId != null &&
+        segment.writerKey === String(targetWriterCvId);
+      if (continuesTarget) {
+        await appendToRun(client, appendTarget!, segment, issuesById);
+      } else {
+        await createRunFromSegment(client, segment, volumeDetail.name, issuesById, writerNameByKey);
+        createdRuns++;
+      }
     }
 
     return {
@@ -413,14 +508,6 @@ export const analyzeVolume = createServerFn({ method: "POST" })
   });
 
 // ---------- Existing single-run lookups ----------
-
-export async function listRunsBySeries(_seriesId: string): Promise<Run[]> {
-  // The `runs` table has no direct series_id column in the current schema;
-  // series ↔ run association lives via run_items → issues → volumes.
-  // Not needed yet — volume-scoped listing (listRunsForVolume) covers the
-  // current UI's needs.
-  return [];
-}
 
 export async function getRun(id: string): Promise<RunWithRelations | null> {
   const result = await supabase

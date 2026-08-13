@@ -63,7 +63,7 @@ function Signup() {
     <AuthShell
       title={t.auth.signup.title}
       subtitle={t.auth.signup.subtitle}
-      footer={<>{t.auth.signup.alreadyHaveAccount} <Link to="/login" className="text-primary hover:underline">{t.auth.signup.signIn}</Link></>}
+      footer={<>{t.auth.signup.alreadyHaveAccount} <Link to="/login" className="text-marvel hover:underline">{t.auth.signup.signIn}</Link></>}
     >
       <form onSubmit={handleSubmit} className="space-y-4"> <div><Label htmlFor="signup-username">{t.auth.signup.usernameLabel}</Label><Input id="signup-username" placeholder={t.auth.signup.usernamePlaceholder} value={username} onChange={(e) => setUsername(e.target.value)} /></div>
         <div><Label htmlFor="signup-email">{t.auth.signup.emailLabel}</Label><Input id="signup-email" type="email" placeholder={t.auth.signup.emailPlaceholder} value={email} onChange={(e) => setEmail(e.target.value)}/></div>

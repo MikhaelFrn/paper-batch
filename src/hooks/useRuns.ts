@@ -1,24 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { RelationshipType, Run, RunWithItems, RunWithRelations } from "@/lib/types";
+import type { RelationshipType, Run, RunVerification, RunWithItems, RunWithRelations } from "@/lib/types";
 import {
   analyzeVolume,
   createRunRelationship,
   deleteRunRelationship,
   getRun,
-  listRunsBySeries,
   listRunsForIssue,
   listRunsForVolume,
   searchRunsForLinking,
 } from "@/services/runs";
+import { listRunVerifications, unverifyRun, verifyRun } from "@/services/runVerifications";
 import { queryKeys } from "./queryKeys";
-
-export function useRunsBySeries(seriesId: string | undefined) {
-  return useQuery<Run[]>({
-    queryKey: queryKeys.runs.bySeries(seriesId ?? "unknown"),
-    queryFn: () => listRunsBySeries(seriesId as string),
-    enabled: !!seriesId,
-  });
-}
 
 export function useRunsForVolume(volumeId: string | undefined) {
   return useQuery<RunWithItems[]>({
@@ -79,13 +71,32 @@ export function useDeleteRunRelationship() {
   });
 }
 
+export function useRunVerifications(runId: string | undefined) {
+  return useQuery<RunVerification[]>({
+    queryKey: queryKeys.runs.verifications(runId ?? "unknown"),
+    queryFn: () => listRunVerifications(runId as string),
+    enabled: !!runId,
+  });
+}
+
+export function useToggleRunVerification() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ runId, isVerified }: { runId: string; isVerified: boolean }) =>
+      isVerified ? unverifyRun(runId) : verifyRun(runId),
+    onSuccess: (_result, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.runs.verifications(vars.runId) });
+    },
+  });
+}
+
 /** Runs the full derivation pipeline for a volume: imports every issue
  * (one ComicVine call each — the expensive part), derives run segments
  * from the writer sequence, and persists them. */
 export function useAnalyzeVolume() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { volumeDetailUrl: string; issueRange?: { from: number; to: number } }) =>
+    mutationFn: (input: { volumeDetailUrl: string; issueRange?: { from: number; to: number }; fullRescan?: boolean }) =>
       analyzeVolume({ data: input }),
     onSuccess: (_result, _vars, _ctx) => {
       qc.invalidateQueries({ queryKey: queryKeys.runs.all });

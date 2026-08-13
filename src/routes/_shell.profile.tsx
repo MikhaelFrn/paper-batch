@@ -190,7 +190,7 @@ function Profile() {
               </div>
               <div className="sm:col-span-2 flex justify-end gap-2">
                 <Button variant="outline" onClick={(e) => handleCancel(e)}>{t.profile.cancel}</Button>
-                <Button hover:brightness-1="true" onClick={(e) => handleClick(e)}>{t.profile.saveChanges}</Button>
+                <Button onClick={(e) => handleClick(e)}>{t.profile.saveChanges}</Button>
               </div>
             </CardContent>
           </Card>

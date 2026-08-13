@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { ComicCard, PublisherBadge } from "@/components/comic-card";
+import { ComicGrid } from "@/components/comic-grid";
 import { Card, CardContent } from "@/components/ui/card";
 import { useSearch } from "@/hooks/useSearch";
 import { useComicVineSearch, useLoadMoreComicVineIssues } from "@/hooks/useComicVine";
@@ -167,9 +168,9 @@ function SearchPage() {
             </p>
           )}
           <Group title={t.search.comics} count={issueComics.length}>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+            <ComicGrid>
               {issueComics.map((c) => <ComicCard key={c.id} comic={c} />)}
-            </div>
+            </ComicGrid>
             {canLoadMore && (
               <div className="mt-4 flex justify-center">
                 <Button variant="outline" onClick={handleLoadMore} disabled={loadMore.isPending}>

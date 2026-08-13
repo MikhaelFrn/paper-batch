@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { ComicCard, PublisherBadge } from "@/components/comic-card";
+import { ComicGrid } from "@/components/comic-grid";
 import { Button } from "@/components/ui/button";
 import { useNewArrivals } from "@/hooks/useComicVine";
 import { cvIssueToComic } from "@/lib/comic-adapters";
@@ -66,11 +67,11 @@ function NewArrivals() {
       ) : weekly.length === 0 ? (
         <div className="py-10 text-sm text-muted-foreground">{t.newArrivals.none}</div>
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+        <ComicGrid>
           {weekly.map((c) => (
             <ComicCard key={c.id} comic={c} />
           ))}
-        </div>
+        </ComicGrid>
       )}
     </div>
   );

@@ -1,9 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Session, User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
 import {
-  getCurrentSession,
   getCurrentUser,
-  requestPasswordReset,
   signInWithGoogle,
   signInWithPassword,
   signOut,
@@ -18,13 +16,6 @@ export function useCurrentUser() {
   return useQuery<User | null>({
     queryKey: queryKeys.auth.user(),
     queryFn: getCurrentUser,
-  });
-}
-
-export function useCurrentSession() {
-  return useQuery<Session | null>({
-    queryKey: queryKeys.auth.session(),
-    queryFn: getCurrentSession,
   });
 }
 
@@ -62,12 +53,6 @@ export function useSignOut() {
     onSuccess: () => {
       qc.clear();
     },
-  });
-}
-
-export function useRequestPasswordReset() {
-  return useMutation({
-    mutationFn: (email: string) => requestPasswordReset(email),
   });
 }
 

@@ -57,19 +57,19 @@ function Login() {
     <AuthShell
       title={t.auth.login.title}
       subtitle={t.auth.login.subtitle}
-      footer={<>{t.auth.login.noAccount} <Link to="/signup" className="text-primary hover:underline">{t.auth.login.createAccount}</Link></>}
+      footer={<>{t.auth.login.noAccount} <Link to="/signup" className="text-marvel hover:underline">{t.auth.login.createAccount}</Link></>}
     >
       <form onSubmit={ handleSubmit } className="space-y-4">
         <div><Label htmlFor="login-email">{t.auth.login.emailLabel}</Label><Input id="login-email" type="email" placeholder={t.auth.login.emailPlaceholder} value={email} onChange={(e) => setEmail(e.target.value)} /></div>
         <div>
           <div className="flex items-center justify-between">
             <Label htmlFor="login-password">{t.auth.login.passwordLabel}</Label>
-            <Link to="/forgot-password" className="text-xs text-muted-foreground hover:text-primary">{t.auth.login.forgot}</Link>
+            <Link to="/forgot-password" className="inline-block py-2 text-xs text-muted-foreground hover:text-primary">{t.auth.login.forgot}</Link>
           </div>
           <Input id="login-password" type="password" placeholder={t.auth.login.passwordPlaceholder} value={password} onChange={(e) => setPassword(e.target.value)}/>
         </div>
         <label className="flex items-center gap-2 text-sm"><Checkbox defaultChecked /> {t.auth.login.keepSignedIn}</label>
-        <Button type="submit" className="w-full" disabled={login.isPending} onChange={(e) => setPassword(e.target.value)}>{login.isPending ? t.auth.login.submitting : t.auth.login.submit}</Button>
+        <Button type="submit" className="w-full" disabled={login.isPending}>{login.isPending ? t.auth.login.submitting : t.auth.login.submit}</Button>
         <Button
           type="button"
           variant="outline"

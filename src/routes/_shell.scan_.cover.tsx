@@ -5,6 +5,8 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ComicCard } from "@/components/comic-card";
+import { ComicGrid } from "@/components/comic-grid";
+import { CenteredMessage } from "@/components/state-blocks";
 import { ImageDropZone } from "@/components/image-drop-zone";
 import { useFindCoverMatches } from "@/hooks/useCoverHash";
 import { issueToComic } from "@/lib/comic-adapters";
@@ -59,9 +61,7 @@ function ScanCoverPage() {
         </div>
       )}
 
-      {phase.kind === "matching" && (
-        <div className="py-20 text-center text-sm text-muted-foreground">{t.scan.comparingCatalog}</div>
-      )}
+      {phase.kind === "matching" && <CenteredMessage message={t.scan.comparingCatalog} />}
 
       {phase.kind === "error" && (
         <div className="mx-auto max-w-md py-16 text-center">
@@ -94,7 +94,7 @@ function ScanCoverPage() {
             </p>
             <Button variant="outline" size="sm" onClick={reset}><RotateCcw className="h-4 w-4" />{t.scan.tryAgain}</Button>
           </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+          <ComicGrid>
             {phase.matches.map((match) => (
               <div key={match.issue.id} className="relative">
                 <ComicCard comic={issueToComic(match.issue)} />
@@ -106,7 +106,7 @@ function ScanCoverPage() {
                 </Badge>
               </div>
             ))}
-          </div>
+          </ComicGrid>
         </div>
       )}
     </div>
