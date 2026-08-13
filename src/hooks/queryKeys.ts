@@ -5,7 +5,6 @@ export const queryKeys = {
   auth: {
     all: ["auth"] as const,
     user: () => [...queryKeys.auth.all, "user"] as const,
-    session: () => [...queryKeys.auth.all, "session"] as const,
   },
   profiles: {
     all: ["profiles"] as const,
@@ -16,30 +15,27 @@ export const queryKeys = {
   publishers: {
     all: ["publishers"] as const,
     list: () => [...queryKeys.publishers.all, "list"] as const,
-    detail: (id: string) => [...queryKeys.publishers.all, id] as const,
   },
   series: {
     all: ["series"] as const,
     list: () => [...queryKeys.series.all, "list"] as const,
-    byPublisher: (publisherId: string) =>
-      [...queryKeys.series.all, "publisher", publisherId] as const,
     detail: (id: string) => [...queryKeys.series.all, id] as const,
   },
   volumes: {
     all: ["volumes"] as const,
-    bySeries: (seriesId: string) =>
-      [...queryKeys.volumes.all, "series", seriesId] as const,
     detail: (id: string) => [...queryKeys.volumes.all, id] as const,
   },
   runs: {
     all: ["runs"] as const,
-    bySeries: (seriesId: string) =>
-      [...queryKeys.runs.all, "series", seriesId] as const,
     byVolume: (volumeId: string) =>
       [...queryKeys.runs.all, "volume", volumeId] as const,
     byIssue: (issueId: string) =>
       [...queryKeys.runs.all, "issue", issueId] as const,
     detail: (id: string) => [...queryKeys.runs.all, id] as const,
+    searchForLinking: (query: string, excludeRunId: string) =>
+      [...queryKeys.runs.all, "searchForLinking", excludeRunId, query] as const,
+    verifications: (runId: string) =>
+      [...queryKeys.runs.detail(runId), "verifications"] as const,
   },
   issues: {
     all: ["issues"] as const,
@@ -48,12 +44,6 @@ export const queryKeys = {
     byVolume: (volumeId: string) =>
       [...queryKeys.issues.all, "volume", volumeId] as const,
     detail: (id: string) => [...queryKeys.issues.all, id] as const,
-  },
-  creators: {
-    all: ["creators"] as const,
-    list: (limit?: number) =>
-      [...queryKeys.creators.all, "list", limit ?? null] as const,
-    detail: (id: string) => [...queryKeys.creators.all, id] as const,
   },
   userComics: {
     all: ["userComics"] as const,

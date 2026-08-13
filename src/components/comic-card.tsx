@@ -1,11 +1,13 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Bookmark, BookOpen, Heart, Star } from "lucide-react";
+import { Bookmark, Heart, Star } from "lucide-react";
 import { toast } from "sonner";
 import { ComicCover } from "./comic-cover";
 import { Badge } from "@/components/ui/badge";
 import type { Comic } from "@/lib/comic-adapters";
 import { cn } from "@/lib/utils";
+import { getKnownSafeErrorKind } from "@/lib/rate-limit-messages";
 import { useImportComicVineIssue } from "@/hooks/useComicVine";
+import { useTranslation } from "@/i18n";
 
 function formatYear(releaseDate: string): number | null {
   if (!releaseDate) return null;
@@ -22,10 +24,15 @@ function ComicCardBody({
   compact: boolean;
   extraBadge?: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <div className="relative">
-        <ComicCover comic={comic} size={compact ? "sm" : "md"} className="transition-transform duration-300 group-hover:-translate-y-1 group-hover:shadow-2xl" />
+        <ComicCover
+          comic={comic}
+          size={compact ? "sm" : "md"}
+          className="transition-transform duration-300 group-hover:-translate-y-1 group-hover:shadow-2xl group-focus-visible:-translate-y-1 group-focus-visible:shadow-2xl"
+        />
         {extraBadge && (
           <div className="pointer-events-none absolute left-1.5 top-1.5">{extraBadge}</div>
         )}
@@ -43,15 +50,15 @@ function ComicCardBody({
         </div>
         <div className="pointer-events-none absolute left-1.5 bottom-1.5 flex gap-1">
           {comic.owned && (
-            <Badge className="h-5 border-0 bg-emerald-600/90 px-1.5 text-[9px] text-white">OWNED</Badge>
+            <Badge className="h-5 border-0 bg-emerald-600/90 px-1.5 text-[9px] text-white">{t.comicCard.owned}</Badge>
           )}
           {comic.read && (
-            <Badge className="h-5 border-0 bg-accent/90 px-1.5 text-[9px]">READ</Badge>
+            <Badge className="h-5 border-0 bg-accent/90 px-1.5 text-[9px]">{t.comicCard.read}</Badge>
           )}
         </div>
       </div>
       <div className="min-w-0">
-        <div className="truncate text-sm font-medium text-foreground group-hover:text-primary">
+        <div className="truncate text-sm font-medium text-foreground group-hover:text-primary group-focus-visible:text-primary">
           {comic.series} #{comic.issue}
         </div>
         <div className={cn("truncate text-xs text-muted-foreground", compact && "hidden")}>
@@ -78,6 +85,7 @@ function UnimportedComicCard({
 }) {
   const navigate = useNavigate();
   const importIssue = useImportComicVineIssue();
+  const { t } = useTranslation();
 
   const handleImport = () => {
     if (importIssue.isPending) return;
@@ -88,8 +96,9 @@ function UnimportedComicCard({
           onImported?.(issueId);
           navigate({ to: "/comic/$id", params: { id: issueId } });
         },
-        onError: () => {
-          toast.error("Couldn't import this issue from ComicVine.");
+        onError: (error) => {
+          const kind = getKnownSafeErrorKind(error);
+          toast.error(kind ? t.errors[kind] : t.comicCard.importFailed);
         },
       },
     );
@@ -100,14 +109,14 @@ function UnimportedComicCard({
       type="button"
       onClick={handleImport}
       disabled={importIssue.isPending}
-      className="group block w-full space-y-2 text-left outline-none disabled:opacity-60"
+      className="group block w-full space-y-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-60"
     >
       <ComicCardBody
         comic={comic}
         compact={compact}
         extraBadge={
           <Badge className="h-5 border-0 bg-sky-600/90 px-1.5 text-[9px] text-white">
-            {importIssue.isPending ? "Adding…" : "ComicVine"}
+            {importIssue.isPending ? t.comicCard.adding : "ComicVine"}
           </Badge>
         }
       />
@@ -139,7 +148,7 @@ export function ComicCard({
     <Link
       to="/comic/$id"
       params={{ id: comic.id }}
-      className="group block space-y-2 outline-none"
+      className="group block space-y-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
       <ComicCardBody comic={comic} compact={compact} />
     </Link>
@@ -147,14 +156,18 @@ export function ComicCard({
 }
 
 export function PublisherBadge({ publisher }: { publisher: Comic["publisher"] }) {
+  // Keys are ComicVine's actual canonical publisher names — see
+  // publisherAccent (comic-adapters.ts) for why this isn't shorthand.
+  // Deliberately never translated: these are proper nouns/brand names,
+  // not UI copy.
   const cls: Record<string, string> = {
     Marvel: "bg-primary/15 text-primary border-primary/30",
-    DC: "bg-accent/15 text-accent border-accent/30",
+    "DC Comics": "bg-accent/15 text-accent border-accent/30",
     Image: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-    "Dark Horse": "bg-zinc-500/15 text-zinc-300 border-zinc-500/30",
-    "Boom Studios": "bg-amber-500/15 text-amber-400 border-amber-500/30",
-    IDW: "bg-red-500/15 text-red-300 border-red-500/30",
-    Valiant: "bg-violet-500/15 text-violet-300 border-violet-500/30",
+    "Dark Horse Comics": "bg-zinc-500/15 text-zinc-300 border-zinc-500/30",
+    "Boom! Studios": "bg-amber-500/15 text-amber-400 border-amber-500/30",
+    "IDW Publishing": "bg-red-500/15 text-red-300 border-red-500/30",
+    "DMG/Valiant Entertainment": "bg-violet-500/15 text-violet-300 border-violet-500/30",
   };
   return (
     <span className={cn("inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", cls[publisher])}>
@@ -173,6 +186,3 @@ export function RatingStars({ value }: { value?: number }) {
   );
 }
 
-export function ReadIcon() {
-  return <BookOpen className="h-3.5 w-3.5" />;
-}

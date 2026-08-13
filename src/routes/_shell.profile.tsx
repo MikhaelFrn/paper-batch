@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import { getCurrentUser, updateAuthUser } from "@/services/auth";
+import { useTranslation } from "@/i18n";
 
 export const Route = createFileRoute("/_shell/profile")({
   head: () => ({
@@ -52,6 +53,7 @@ function initials(name: string): string {
 }
 
 function Profile() {
+  const { t } = useTranslation();
   const profile = useMyProfile();
   const navigate = useNavigate();
   const update = useUpdateMyProfile();
@@ -82,10 +84,10 @@ function Profile() {
         await updateAuthUser({
           email,
         });
-        toast.success("Information updated!");
+        toast.success(t.profile.informationUpdated);
         navigate({ to: "/profile" });
         } catch (error) {
-          toast.error("Invalid info provided.");
+          toast.error(t.profile.invalidInfo);
         }
   }
   const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,8 +99,8 @@ function Profile() {
   const handleAvatarCropped = (blob: Blob) => {
     setPendingAvatarFile(null);
     uploadAvatar.mutate(blob, {
-      onSuccess: () => toast.success("Profile picture updated!"),
-      onError: (error) => toast.error(error instanceof Error ? error.message : "Couldn't upload that image."),
+      onSuccess: () => toast.success(t.profile.profilePictureUpdated),
+      onError: (error) => toast.error(error instanceof Error ? error.message : t.profile.uploadFailed),
     });
   }
 
@@ -131,7 +133,7 @@ function Profile() {
 
   return (
     <div>
-      <PageHeader eyebrow="Account" title="Profile" description="Edit your details and see your collection stats." />
+      <PageHeader eyebrow={t.profile.eyebrow} title={t.profile.title} description={t.profile.description} />
 
       <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
         <Card className="border-border/60">
@@ -151,6 +153,7 @@ function Profile() {
               <Button
                 size="icon"
                 type="button"
+                aria-label={t.profile.changeProfilePicture}
                 disabled={uploadAvatar.isPending}
                 className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full"
                 onClick={() => avatarInputRef.current?.click()}
@@ -161,64 +164,64 @@ function Profile() {
             <div className="mt-4 font-display text-xl tracking-wide">{displayName || "—"}</div>
             <div className="text-xs text-muted-foreground">@{username || "—"}</div>
             <div className="mt-4 grid w-full grid-cols-2 gap-2 text-xs">
-              <div className="rounded bg-muted/40 p-2"><div className="font-semibold">{stats.owned}</div><div className="text-muted-foreground">Owned</div></div>
-              <div className="rounded bg-muted/40 p-2"><div className="font-semibold">{stats.read}</div><div className="text-muted-foreground">Read</div></div>
+              <div className="rounded bg-muted/40 p-2"><div className="font-semibold">{stats.owned}</div><div className="text-muted-foreground">{t.profile.owned}</div></div>
+              <div className="rounded bg-muted/40 p-2"><div className="font-semibold">{stats.read}</div><div className="text-muted-foreground">{t.profile.read}</div></div>
             </div>
           </CardContent>
         </Card>
 
         <div className="space-y-6">
           <Card className="border-border/60">
-            <CardHeader><CardTitle>Account details</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t.profile.accountDetails}</CardTitle></CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
-              <div><Label>Username</Label><Input value={username} onChange={(e) => setUsername(e.target.value)}/></div>
-              <div><Label>Display name</Label><Input value={displayName} onChange={(e) => setDisplayName(e.target.value)}/></div>
-              <div className="sm:col-span-2"><Label>Email</Label><Input value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+              <div><Label htmlFor="profile-username">{t.profile.username}</Label><Input id="profile-username" value={username} onChange={(e) => setUsername(e.target.value)}/></div>
+              <div><Label htmlFor="profile-display-name">{t.profile.displayName}</Label><Input id="profile-display-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)}/></div>
+              <div className="sm:col-span-2"><Label htmlFor="profile-email">{t.profile.email}</Label><Input id="profile-email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
               <div className="sm:col-span-2">
-                <Label>Password</Label>
+                <Label>{t.profile.password}</Label>
                 <div className="mt-2 flex items-center justify-between rounded-md border border-border p-3">
                   <span className="text-sm text-muted-foreground">
-                    Reset your password via email.
+                    {t.profile.resetPasswordDescription}
                   </span>
                   <Button type="button" variant="outline" onClick={() => navigate({ to: "/forgot-password" })}>
-                    Reset password
+                    {t.profile.resetPassword}
                   </Button>
                 </div>
               </div>
               <div className="sm:col-span-2 flex justify-end gap-2">
-                <Button variant="outline" onClick={(e) => handleCancel(e)}>Cancel</Button>
-                <Button hover:brightness-1="true" onClick={(e) => handleClick(e)}>Save changes</Button>
+                <Button variant="outline" onClick={(e) => handleCancel(e)}>{t.profile.cancel}</Button>
+                <Button onClick={(e) => handleClick(e)}>{t.profile.saveChanges}</Button>
               </div>
             </CardContent>
           </Card>
 
           <div>
-            <h3 className="font-display mb-3 text-lg tracking-wide">Collection stats</h3>
+            <h3 className="font-display mb-3 text-lg tracking-wide">{t.profile.collectionStats}</h3>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Stat label="Owned" value={stats.owned} />
-              <Stat label="Read" value={stats.read} />
-              <Stat label="Wishlist" value={stats.wishlist} />
-              <Stat label="Favorites" value={stats.favorites} />
-              <Stat label="Custom lists" value={stats.lists} />
-              <Stat label="Total issues" value={stats.totalIssues.toLocaleString()} />
-              <Stat label="Publishers" value={favPublishers.data?.length ?? 0} />
-              <Stat label="Series" value={favSeries.data?.length ?? 0} />
+              <Stat label={t.profile.owned} value={stats.owned} />
+              <Stat label={t.profile.read} value={stats.read} />
+              <Stat label={t.profile.wishlist} value={stats.wishlist} />
+              <Stat label={t.profile.favorites} value={stats.favorites} />
+              <Stat label={t.profile.customLists} value={stats.lists} />
+              <Stat label={t.profile.totalIssues} value={stats.totalIssues.toLocaleString()} />
+              <Stat label={t.profile.publishers} value={favPublishers.data?.length ?? 0} />
+              <Stat label={t.profile.series} value={favSeries.data?.length ?? 0} />
             </div>
           </div>
 
           <Card className="border-border/60">
-            <CardHeader><CardTitle>Taste profile</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t.profile.tasteProfile}</CardTitle></CardHeader>
             <CardContent className="space-y-4 text-sm">
               <div>
-                <div className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">Favorite publishers</div>
+                <div className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">{t.profile.favoritePublishers}</div>
                 <div className="flex flex-wrap gap-2">{(favPublishers.data ?? []).map((p) => <PublisherBadge key={p.id} publisher={p.name} />)}</div>
               </div>
               <div>
-                <div className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">Favorite series</div>
+                <div className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">{t.profile.favoriteSeries}</div>
                 <div className="flex flex-wrap gap-2">{(favSeries.data ?? []).map((s) => <Link key={s.id} to="/search" search={{ q: s.name }} className="rounded-md border border-border bg-muted/40 px-2 py-1 text-xs hover:border-primary/40 hover:text-primary">{s.name}</Link>)}</div>
               </div>
               <div>
-                <div className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">Favorite creators</div>
+                <div className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">{t.profile.favoriteCreators}</div>
                 <div className="flex flex-wrap gap-2">{(favCreators.data ?? []).map((c) => <span key={c.id} className="rounded-md border border-border bg-muted/40 px-2 py-1 text-xs">{[c.first_name, c.last_name].filter(Boolean).join(" ")}</span>)}</div>
               </div>
             </CardContent>

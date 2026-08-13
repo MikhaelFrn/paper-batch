@@ -14,6 +14,7 @@ import {
 import { useMyLists, useList } from "@/hooks/useLists";
 import { useMyProfile } from "@/hooks/useProfiles";
 import { cvIssueToComic, issueToComic, userComicToComic } from "@/lib/comic-adapters";
+import { useTranslation } from "@/i18n";
 export const Route = createFileRoute("/_shell/")({
   head: () => ({
     meta: [
@@ -43,12 +44,13 @@ function StatCard({ icon: Icon, label, value, tone }: { icon: typeof Library; la
 }
 
 function SectionHeader({ title, to }: { title: string; to?: string }) {
+  const { t } = useTranslation();
   return (
     <div className="mb-3 flex items-end justify-between gap-2">
       <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
       {to && (
         <Link to={to} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary">
-          View all <ArrowRight className="h-3.5 w-3.5" />
+          {t.dashboard.viewAll} <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       )}
     </div>
@@ -56,6 +58,7 @@ function SectionHeader({ title, to }: { title: string; to?: string }) {
 }
 
 function Dashboard() {
+  const { t } = useTranslation();
   const profile = useMyProfile();
   const collection = useUserCollection();
   const newArrivals = useNewArrivals();
@@ -87,7 +90,7 @@ function Dashboard() {
     favorites: (favSeries.data?.length ?? 0) + (favPublishers.data?.length ?? 0) + (favCreators.data?.length ?? 0),
   };
 
-  const displayName = profile.data?.display_name ?? profile.data?.username ?? "collector";
+  const displayName = profile.data?.display_name ?? profile.data?.username ?? t.dashboard.defaultCollectorName;
 
   return (
     <div className="space-y-8">
@@ -96,32 +99,32 @@ function Dashboard() {
         <div className="absolute inset-0 opacity-30 mix-blend-overlay" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.5) 1px, transparent 0)", backgroundSize: "8px 8px" }} />
         <div className="relative grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
           <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80">Welcome back, {displayName}</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80">{t.dashboard.welcomeBack(displayName)}</div>
             <h1 className="font-display mt-1 text-3xl tracking-wide text-white sm:text-5xl">
-              {stats.owned} issues in your vault.
+              {t.dashboard.issuesInVault(stats.owned)}
             </h1>
             <p className="mt-2 max-w-lg text-sm text-white/85">
-              You've got {arrivals.length} new arrivals waiting this week.
+              {t.dashboard.newArrivalsWaiting(arrivals.length)}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button asChild variant="secondary"><Link to="/new-arrivals"><Sparkles className="h-4 w-4" />What's new</Link></Button>
-            <Button asChild className="bg-white text-black hover:bg-white/90"><Link to="/inventory">Browse collection</Link></Button>
+            <Button asChild variant="secondary"><Link to="/new-arrivals"><Sparkles className="h-4 w-4" />{t.dashboard.whatsNew}</Link></Button>
+            <Button asChild className="bg-white text-black hover:bg-white/90"><Link to="/inventory">{t.dashboard.browseCollection}</Link></Button>
           </div>
         </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard icon={Library} label="Owned" value={stats.owned} tone="bg-primary/15 text-primary" />
-        <StatCard icon={BookOpen} label="Read" value={stats.read} tone="bg-accent/15 text-accent" />
-        <StatCard icon={Bookmark} label="Wishlist" value={stats.wishlist} tone="bg-gold/15 text-gold" />
-        <StatCard icon={Heart} label="Favorites" value={stats.favorites} tone="bg-emerald-500/15 text-emerald-400" />
+        <StatCard icon={Library} label={t.dashboard.owned} value={stats.owned} tone="bg-primary/15 text-primary" />
+        <StatCard icon={BookOpen} label={t.dashboard.read} value={stats.read} tone="bg-accent/15 text-accent" />
+        <StatCard icon={Bookmark} label={t.dashboard.wishlist} value={stats.wishlist} tone="bg-gold/15 text-gold" />
+        <StatCard icon={Heart} label={t.dashboard.favorites} value={stats.favorites} tone="bg-emerald-500/15 text-emerald-400" />
       </div>
 
       {/* Recently added */}
       <section>
-        <SectionHeader title="Recently added" to="/inventory" />
+        <SectionHeader title={t.dashboard.recentlyAdded} to="/inventory" />
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
           {recent.map((c) => (
             <ComicCard key={c.id} comic={c} />
@@ -131,7 +134,7 @@ function Dashboard() {
 
       {/* New arrivals */}
       <section>
-        <SectionHeader title="New arrivals this week" to="/new-arrivals" />
+        <SectionHeader title={t.dashboard.newArrivalsThisWeek} to="/new-arrivals" />
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
           {arrivals.map((c) => (
             <ComicCard key={c.id} comic={c} />
@@ -143,13 +146,13 @@ function Dashboard() {
       <section className="grid gap-6 lg:grid-cols-3">
         <Card className="border-border/60 lg:col-span-2">
           <CardHeader className="flex-row items-center justify-between">
-            <CardTitle className="text-lg">Wishlist preview</CardTitle>
+            <CardTitle className="text-lg">{t.dashboard.wishlistPreview}</CardTitle>
             <Link
               to={wishlistList ? "/lists/$id" : "/lists"}
               params={wishlistList ? { id: wishlistList.id } : undefined}
               className="text-xs text-muted-foreground hover:text-primary"
             >
-              Manage
+              {t.dashboard.manage}
             </Link>
           </CardHeader>
           <CardContent>
@@ -163,7 +166,7 @@ function Dashboard() {
 
         <div className="space-y-4">
           <Card className="border-border/60">
-            <CardHeader><CardTitle className="text-sm uppercase tracking-widest text-muted-foreground">Favorite series</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-sm uppercase tracking-widest text-muted-foreground">{t.dashboard.favoriteSeries}</CardTitle></CardHeader>
             <CardContent className="space-y-2">
               {(favSeries.data ?? []).map((s) => (
                 <Link
@@ -179,7 +182,7 @@ function Dashboard() {
             </CardContent>
           </Card>
           <Card className="border-border/60">
-            <CardHeader><CardTitle className="text-sm uppercase tracking-widest text-muted-foreground">Favorite publishers</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-sm uppercase tracking-widest text-muted-foreground">{t.dashboard.favoritePublishers}</CardTitle></CardHeader>
             <CardContent className="flex flex-wrap gap-2">
               {(favPublishers.data ?? []).map((p) => (
                 <span key={p.id} className="rounded-md border border-border bg-muted/40 px-2 py-1 text-xs">{p.name}</span>
@@ -187,7 +190,7 @@ function Dashboard() {
             </CardContent>
           </Card>
           <Card className="border-border/60">
-            <CardHeader><CardTitle className="text-sm uppercase tracking-widest text-muted-foreground">Favorite creators</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-sm uppercase tracking-widest text-muted-foreground">{t.dashboard.favoriteCreators}</CardTitle></CardHeader>
             <CardContent className="space-y-1 text-sm">
               <div className="text-sm">{(favCreators.data ?? []).map((c) => [c.first_name, c.last_name].filter(Boolean).join(" ")).join(" · ") || "—"}</div>
             </CardContent>

@@ -20,6 +20,7 @@ import { useSignOut } from "@/hooks/useAuth";
 import { useSearch } from "@/hooks/useSearch";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { issueToComic } from "@/lib/comic-adapters";
+import { useTranslation } from "@/i18n";
 import { toast } from "sonner";
 
 /** Local-catalog-only quick suggestions while typing — no ComicVine calls,
@@ -33,6 +34,7 @@ function SearchSuggestions({
   query: string;
   onNavigate: (issueId: string) => void;
 }) {
+  const { t } = useTranslation();
   const debouncedQuery = useDebouncedValue(query, 250);
   const results = useSearch(debouncedQuery, { limit: 6 });
   const issues = results.data?.issues ?? [];
@@ -40,9 +42,9 @@ function SearchSuggestions({
   return (
     <div className="absolute inset-x-0 top-full z-50 mt-1 overflow-hidden rounded-md border border-border bg-popover shadow-lg">
       {results.isLoading ? (
-        <div className="p-3 text-sm text-muted-foreground">Searching your catalog…</div>
+        <div className="p-3 text-sm text-muted-foreground">{t.topbar.searchingCatalog}</div>
       ) : issues.length === 0 ? (
-        <div className="p-3 text-sm text-muted-foreground">No matches in your catalog.</div>
+        <div className="p-3 text-sm text-muted-foreground">{t.topbar.noCatalogMatches}</div>
       ) : (
         <ul className="max-h-80 overflow-y-auto py-1">
           {issues.map((issue) => {
@@ -74,6 +76,7 @@ export function Topbar() {
   const { data: user } = useCurrentUser();
   const { data: profile } = useMyProfile();
   const signOut = useSignOut();
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const handleSignOut = async () => {
@@ -81,14 +84,14 @@ export function Topbar() {
     await signOut.mutateAsync();
     navigate({ to: "/login" });
   } catch {
-    toast.error("Failed to sign out.");
+    toast.error(t.topbar.signOutFailed);
   }
 };
   const displayName =
   profile?.display_name ??
   profile?.username ??
   user?.email?.split("@")[0] ??
-  "Collector";
+  t.topbar.defaultDisplayName;
 
   const email = user?.email ?? "";
 
@@ -126,7 +129,8 @@ export function Topbar() {
           onKeyDown={(e) => {
             if (e.key === "Escape") setShowSuggestions(false);
           }}
-          placeholder="Search comics, series, writers, characters…"
+          placeholder={t.topbar.searchPlaceholder}
+          aria-label={t.topbar.searchAriaLabel}
           className="h-9 border-border/60 bg-muted/50 pl-9 pr-14 focus-visible:ring-primary/40"
         />
         <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline">
@@ -147,11 +151,15 @@ export function Topbar() {
 
       <div className="ml-auto flex items-center gap-2">
         <Button variant="outline" size="sm" asChild>
-          <Link to="/scan"><ScanBarcode className="h-4 w-4" />Scan</Link>
+          <Link to="/scan"><ScanBarcode className="h-4 w-4" />{t.topbar.scan}</Link>
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 rounded-full pl-1 pr-2 hover:bg-muted/60">
+            <button
+              type="button"
+              aria-label={t.topbar.accountMenu}
+              className="flex items-center gap-2 rounded-full pl-1 pr-2 hover:bg-muted/60"
+            >
               <Avatar className="h-8 w-8 ring-2 ring-primary/60">
                 <AvatarImage src={profile?.avatar_url ?? ""} alt={displayName} />
                 <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-xs font-bold text-white">
@@ -168,14 +176,14 @@ export function Topbar() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link to="/profile"><UserIcon className="mr-2 h-4 w-4" />Profile</Link>
+              <Link to="/profile"><UserIcon className="mr-2 h-4 w-4" />{t.nav.profile}</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link to="/settings"><Settings className="mr-2 h-4 w-4" />Settings</Link>
+              <Link to="/settings"><Settings className="mr-2 h-4 w-4" />{t.nav.settings}</Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut}>
-              <LogOut className="mr-2 h-4 w-4" />Sign out
+              <LogOut className="mr-2 h-4 w-4" />{t.topbar.signOut}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

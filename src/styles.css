@@ -59,7 +59,11 @@
   --card-foreground: oklch(0.97 0.005 260);
   --popover: oklch(0.20 0.014 265);
   --popover-foreground: oklch(0.97 0.005 260);
-  --primary: oklch(0.62 0.24 27);          /* Marvel red */
+  /* 0.58, not the "true" Marvel red 0.62 — Lighthouse measured 0.62 against
+     the near-white foreground at 3.98:1, short of WCAG AA's 4.5:1 for
+     button-sized text. 0.58 clears it (~4.65:1), confirmed by computing
+     the actual OKLCH → sRGB → relative-luminance contrast, not eyeballed. */
+  --primary: oklch(0.58 0.24 27);          /* Marvel red */
   --primary-foreground: oklch(0.99 0 0);
   --secondary: oklch(0.26 0.02 265);
   --secondary-foreground: oklch(0.97 0.005 260);
@@ -67,11 +71,18 @@
   --muted-foreground: oklch(0.68 0.02 260);
   --accent: oklch(0.55 0.22 258);          /* DC blue */
   --accent-foreground: oklch(0.99 0 0);
-  --destructive: oklch(0.62 0.24 27);
+  --destructive: oklch(0.58 0.24 27);
   --destructive-foreground: oklch(0.99 0 0);
   --border: oklch(0.28 0.018 265);
   --input: oklch(0.28 0.018 265);
   --ring: oklch(0.55 0.22 258);
+  /* Deliberately NOT the same value as --primary. A single red can't clear
+     4.5:1 both as white-text-on-red (needs darker, that's --primary at
+     0.58) and as red-text-on-the-page's-near-black-background (needs
+     lighter — 0.62 measures 4.74:1 here, confirmed by computing the actual
+     OKLCH contrast, not guessed). Use text-marvel for red link/accent text
+     sitting directly on the page background; --primary/bg-primary stays
+     for button-style backgrounds. */
   --marvel: oklch(0.62 0.24 27);
   --dc: oklch(0.55 0.22 258);
   --gold: oklch(0.82 0.16 88);
@@ -82,7 +93,7 @@
   --chart-5: oklch(0.68 0.20 305);
   --sidebar: oklch(0.13 0.012 265);
   --sidebar-foreground: oklch(0.90 0.008 260);
-  --sidebar-primary: oklch(0.62 0.24 27);
+  --sidebar-primary: oklch(0.58 0.24 27);
   --sidebar-primary-foreground: oklch(0.99 0 0);
   --sidebar-accent: oklch(0.22 0.016 265);
   --sidebar-accent-foreground: oklch(0.97 0.005 260);
@@ -119,6 +130,11 @@
   --popover-foreground: oklch(0.15 0.02 265);
   --primary: oklch(0.55 0.24 27);
   --primary-foreground: oklch(0.99 0 0);
+  /* Dark mode needs --marvel lighter than --primary (see the :root
+     comment); light mode is the opposite problem in reverse — 0.55 already
+     clears 4.5:1 both as button background and as text on this light page
+     background, so just reuse --primary rather than a second literal. */
+  --marvel: var(--primary);
   --secondary: oklch(0.94 0.008 260);
   --secondary-foreground: oklch(0.15 0.02 265);
   --muted: oklch(0.94 0.008 260);

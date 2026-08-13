@@ -6,8 +6,11 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/state-blocks";
+import { ListFormFields } from "@/components/list-form-fields";
 import { useMyLists, useCreateList } from "@/hooks/useLists";
 import type { ListType, ListVisibility } from "@/lib/types";
+import { useTranslation } from "@/i18n";
 import {
   Dialog,
   DialogContent,
@@ -17,17 +20,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/_shell/lists")({
   head: () => ({
@@ -41,21 +33,10 @@ export const Route = createFileRoute("/_shell/lists")({
   component: Lists,
 });
 
-const TYPE_LABEL: Record<ListType, string> = {
-  wishlist: "Wishlist",
-  reading: "Reading",
-  custom: "Custom",
-};
-
 const TYPE_ICON: Record<ListType, typeof Bookmark> = {
   wishlist: Bookmark,
   reading: BookOpen,
   custom: ListChecks,
-};
-
-const ROLE_LABEL: Record<"editor" | "viewer", string> = {
-  editor: "Editor",
-  viewer: "Viewer",
 };
 
 // A shared list's banner is recolored by role so it reads at a glance
@@ -70,6 +51,7 @@ const ROLE_GRADIENT: Record<"editor" | "viewer", string> = {
 };
 
 function NewListDialog() {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -86,7 +68,7 @@ function NewListDialog() {
 
   const handleCreate = () => {
     if (!name.trim()) {
-      toast.error("Give your list a name first.");
+      toast.error(t.lists.nameRequired);
       return;
     }
     createList.mutate(
@@ -98,11 +80,11 @@ function NewListDialog() {
       },
       {
         onSuccess: () => {
-          toast.success("List created.");
+          toast.success(t.lists.listCreated);
           reset();
           setOpen(false);
         },
-        onError: () => toast.error("Couldn't create that list."),
+        onError: () => toast.error(t.lists.createFailed),
       },
     );
   };
@@ -110,41 +92,29 @@ function NewListDialog() {
   return (
     <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) reset(); }}>
       <DialogTrigger asChild>
-        <Button size="sm"><Plus className="h-4 w-4" />New list</Button>
+        <Button size="sm"><Plus className="h-4 w-4" />{t.lists.newList}</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create a new list</DialogTitle>
-          <DialogDescription>Give it a name, a type, and a vibe.</DialogDescription>
+          <DialogTitle>{t.lists.createDialogTitle}</DialogTitle>
+          <DialogDescription>{t.lists.createDialogDescription}</DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <div>
-            <Label>Name</Label>
-            <Input placeholder="Best Cosmic Stories" value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div>
-            <Label>Description</Label>
-            <Textarea placeholder="What's this list about?" value={description} onChange={(e) => setDescription(e.target.value)} />
-          </div>
-          <div>
-            <Label>Type</Label>
-            <Select value={type} onValueChange={(v) => setType(v as ListType)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="custom">Custom</SelectItem>
-                <SelectItem value="wishlist">Wishlist</SelectItem>
-                <SelectItem value="reading">Reading</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center justify-between">
-            <Label>Public</Label>
-            <Switch checked={isPublic} onCheckedChange={setIsPublic} />
-          </div>
-        </div>
+        <ListFormFields
+          idPrefix="new-list"
+          name={name}
+          onNameChange={setName}
+          namePlaceholder={t.lists.namePlaceholder}
+          description={description}
+          onDescriptionChange={setDescription}
+          descriptionPlaceholder={t.lists.descriptionPlaceholder}
+          isPublic={isPublic}
+          onPublicChange={setIsPublic}
+          type={type}
+          onTypeChange={setType}
+        />
         <DialogFooter>
           <Button onClick={handleCreate} disabled={createList.isPending}>
-            {createList.isPending ? "Creating…" : "Create list"}
+            {createList.isPending ? t.lists.creating : t.lists.createList}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -153,26 +123,33 @@ function NewListDialog() {
 }
 
 function Lists() {
+  const { t } = useTranslation();
   const lists = useMyLists();
   const rows = lists.data ?? [];
+
+  const TYPE_LABEL: Record<ListType, string> = {
+    wishlist: t.lists.typeWishlist,
+    reading: t.lists.typeReading,
+    custom: t.lists.typeCustom,
+  };
+  const ROLE_LABEL: Record<"editor" | "viewer", string> = {
+    editor: t.lists.roleEditor,
+    viewer: t.lists.roleViewer,
+  };
 
   return (
     <div>
       <PageHeader
-        eyebrow="Curate"
-        title="Lists"
-        description={`${rows.length} list${rows.length === 1 ? "" : "s"} · wishlist, reading, and anything else you want to track`}
+        eyebrow={t.lists.eyebrow}
+        title={t.lists.title}
+        description={t.lists.description(rows.length)}
         actions={<NewListDialog />}
       />
 
       {lists.isLoading ? (
-        <div className="py-10 text-sm text-muted-foreground">Loading your lists…</div>
+        <div className="py-10 text-sm text-muted-foreground">{t.lists.loadingLists}</div>
       ) : rows.length === 0 ? (
-        <div className="grid place-items-center rounded-xl border border-dashed border-border py-20 text-center">
-          <ListChecks className="mb-3 h-8 w-8 text-muted-foreground" />
-          <div className="font-medium">No lists yet</div>
-          <div className="text-sm text-muted-foreground">Create one, or add a comic to your wishlist from its detail page.</div>
-        </div>
+        <EmptyState icon={ListChecks} title={t.lists.noListsYet} description={t.lists.noListsDescription} />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {rows.map((list) => {
@@ -188,7 +165,7 @@ function Lists() {
                   <div className="relative h-32 w-full" style={{ backgroundImage: bannerGradient }}>
                     <div className="absolute inset-0 opacity-25 mix-blend-overlay" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.5) 1px, transparent 0)", backgroundSize: "8px 8px" }} />
                     <span className="absolute right-2 top-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] text-white">
-                      {isPublic ? <Globe className="inline h-3 w-3" /> : <Lock className="inline h-3 w-3" />} {isPublic ? "Public" : "Private"}
+                      {isPublic ? <Globe className="inline h-3 w-3" /> : <Lock className="inline h-3 w-3" />} {isPublic ? t.lists.public : t.lists.private}
                     </span>
                     <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-[10px] text-white">
                       <Icon className="h-3 w-3" /> {TYPE_LABEL[list.type]}

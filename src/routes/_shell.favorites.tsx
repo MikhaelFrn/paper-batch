@@ -5,14 +5,18 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ComicCard, PublisherBadge } from "@/components/comic-card";
+import { ComicGrid } from "@/components/comic-grid";
+import { Badge } from "@/components/ui/badge";
 import {
   useFavoriteSeries,
   useFavoritePublishers,
   useFavoriteCreators,
+  useFavoriteRuns,
 } from "@/hooks/useFavorites";
 import { useUserCollection } from "@/hooks/useUserComics";
 import { userComicToComic } from "@/lib/comic-adapters";
 import { isFavoriteIssue } from "@/lib/favorite-match";
+import { useTranslation } from "@/i18n";
 
 export const Route = createFileRoute("/_shell/favorites")({
   head: () => ({
@@ -27,9 +31,11 @@ export const Route = createFileRoute("/_shell/favorites")({
 });
 
 function Favorites() {
+  const { t } = useTranslation();
   const favSeries = useFavoriteSeries();
   const favPublishers = useFavoritePublishers();
   const favCreators = useFavoriteCreators();
+  const favRuns = useFavoriteRuns();
   const collection = useUserCollection();
 
   const favoriteIds = useMemo(
@@ -52,13 +58,14 @@ function Favorites() {
 
   return (
     <div>
-      <PageHeader eyebrow="Your taste" title="Favorites" description="Series, publishers, creators, and the comics that match them." />
+      <PageHeader eyebrow={t.favorites.eyebrow} title={t.favorites.title} description={t.favorites.description} />
       <Tabs defaultValue="series">
         <TabsList>
-          <TabsTrigger value="series">Series</TabsTrigger>
-          <TabsTrigger value="publishers">Publishers</TabsTrigger>
-          <TabsTrigger value="creators">Creators</TabsTrigger>
-          <TabsTrigger value="comics">Comics</TabsTrigger>
+          <TabsTrigger value="series">{t.favorites.series}</TabsTrigger>
+          <TabsTrigger value="publishers">{t.favorites.publishers}</TabsTrigger>
+          <TabsTrigger value="creators">{t.favorites.creators}</TabsTrigger>
+          <TabsTrigger value="runs">{t.favorites.runs}</TabsTrigger>
+          <TabsTrigger value="comics">{t.favorites.comics}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="series" className="mt-6">
@@ -94,13 +101,33 @@ function Favorites() {
           </div>
         </TabsContent>
 
+        <TabsContent value="runs" className="mt-6">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {(favRuns.data ?? []).map((r) => (
+              <Link key={r.id} to="/runs/$id" params={{ id: r.id }}>
+                <Card className="cursor-pointer border-border/60 transition hover:border-primary/40">
+                  <CardHeader className="flex-row items-center justify-between gap-3">
+                    <span className="flex min-w-0 items-center gap-3">
+                      <Heart className="h-5 w-5 shrink-0 fill-primary text-primary" />
+                      <CardTitle className="font-display truncate text-lg tracking-wide">{r.name}</CardTitle>
+                    </span>
+                    <Badge variant={r.status === "verified" ? "default" : "outline"} className="shrink-0">
+                      {r.status === "verified" ? t.common.runStatus.verified : t.common.runStatus.draft}
+                    </Badge>
+                  </CardHeader>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </TabsContent>
+
         <TabsContent value="comics" className="mt-6">
           <p className="mb-4 text-sm text-muted-foreground">
-            Comics from a favorite series or publisher, or with a favorite creator credited on them.
+            {t.favorites.comicsDescription}
           </p>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+          <ComicGrid>
             {favComics.map((c) => <ComicCard key={c.id} comic={c} />)}
-          </div>
+          </ComicGrid>
         </TabsContent>
       </Tabs>
     </div>

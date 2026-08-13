@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { useTranslation } from "@/i18n";
 
 // On-screen crop square, and the exported image's pixel size. Output is
 // deliberately larger than the viewport (avatars get upscaled/displayed at
@@ -46,6 +47,7 @@ export interface AvatarCropDialogProps {
  * for an already-square source, same as Discord's avatar picker: consistent
  * behavior beats conditionally skipping a step depending on input shape. */
 export function AvatarCropDialog({ file, onCancel, onCropped }: AvatarCropDialogProps) {
+  const { t } = useTranslation();
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const [zoom, setZoom] = useState(MIN_ZOOM);
@@ -148,7 +150,7 @@ export function AvatarCropDialog({ file, onCancel, onCropped }: AvatarCropDialog
     >
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Adjust your picture</DialogTitle>
+          <DialogTitle>{t.avatarCrop.adjustPicture}</DialogTitle>
         </DialogHeader>
 
         {imgUrl && (
@@ -174,21 +176,22 @@ export function AvatarCropDialog({ file, onCancel, onCropped }: AvatarCropDialog
         )}
 
         <div className="flex items-center gap-3 px-1">
-          <span className="text-xs text-muted-foreground">Zoom</span>
+          <span className="text-xs text-muted-foreground">{t.avatarCrop.zoom}</span>
           <Slider
             value={[zoom]}
             onValueChange={handleZoomChange}
             min={MIN_ZOOM}
             max={MAX_ZOOM}
             step={0.01}
+            aria-label={t.avatarCrop.zoom}
           />
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={onCancel}>
-            Cancel
+            {t.common.cancel}
           </Button>
-          <Button onClick={handleSave}>Save</Button>
+          <Button onClick={handleSave}>{t.common.save}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

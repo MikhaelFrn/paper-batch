@@ -5,9 +5,10 @@ import type {
   UserComicUpdate,
 } from "@/lib/types";
 import { requireUserId, throwIfError, unwrap, unwrapMaybe } from "./_utils";
+import { ISSUE_RELATIONS_FRAGMENT } from "./issues";
 
 const USER_COMIC_WITH_ISSUE =
-  "*, issue:issues(*, volume:volumes(*, series:series(*, publisher:publishers(*))), issue_creators(role, creator:creators(*)))" as const;
+  `*, issue:issues(*, ${ISSUE_RELATIONS_FRAGMENT})` as const;
 
 export async function listMyCollection(): Promise<UserCollectionEntry[]> {
   const uid = await requireUserId();

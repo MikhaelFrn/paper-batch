@@ -16,10 +16,10 @@ import type {
   CvSearchIssue,
   CvVolumeDetail,
 } from "@/integrations/comicvine/types";
-import { getSupabaseServerClient } from "@/integrations/supabase/server-client";
 import { getSupabaseServiceClient } from "@/integrations/supabase/service-client";
 import { ServiceError } from "@/lib/types";
 import { hashCoverImage } from "./coverHash";
+import { requireAuthenticatedUser } from "./_serverUtils";
 
 export type ComicVineSearchResults = ComicVineIssueSearchResult;
 
@@ -28,13 +28,6 @@ export type ComicVineSearchResults = ComicVineIssueSearchResult;
 // otherwise protect. Every function below hits the CV rate limit and the
 // import path bypasses RLS via the service-role client, so each checks the
 // caller's session itself rather than relying on _shell's route guard.
-async function requireAuthenticatedUser(): Promise<void> {
-  const supabase = getSupabaseServerClient();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) {
-    throw new ServiceError("Not authenticated", { code: "UNAUTHENTICATED" });
-  }
-}
 
 export const searchComicVine = createServerFn({ method: "GET" })
   .validator((query: string) => query)
@@ -88,10 +81,21 @@ export const getNewArrivals = createServerFn({ method: "GET" }).handler(
 // docs/comicvine-and-runs.md for why. Everything else here is a
 // straightforward upsert-by-comicvine_id.
 
-function normalizeSeriesName(name: string): string {
+// Trailing "Annual"/"Special"/etc., optionally followed by a year or
+// issue number ("Amazing Spider-Man Annual 2020", "Batman Special #1") —
+// stripped so these group into their parent series rather than becoming
+// their own separate one. Explicit decision (previously an open question
+// in docs/comicvine-and-runs.md): annuals/specials/one-shots are
+// additional publications *of* a series, not a distinct series of their
+// own. Anchored to the end and requires a preceding word, so a volume
+// actually just named "Annual" with nothing else wouldn't match.
+const ANNUAL_SUFFIX = /\s+(annual|special|one-shot|one shot|giant-size|giant size)s?(\s*#?\d+)?$/i;
+
+export function normalizeSeriesName(name: string): string {
   return name
     .toLowerCase()
     .replace(/^the\s+/, "")
+    .replace(ANNUAL_SUFFIX, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 }

@@ -7,10 +7,11 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
+import { Toaster } from "@/components/ui/sonner";
+import { LocaleProvider } from "@/i18n";
 
 function NotFoundComponent() {
   return (
@@ -37,9 +38,6 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -79,12 +77,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Comic Vault" },
       { name: "description", content: "An easier way to keep track of your comic collection and wishlist" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "Comic Vault" },
+      { property: "og:description", content: "An easier way to keep track of your comic collection and wishlist" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {
@@ -119,8 +115,20 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      {/* Root-level, not _shell-level: language needs to work on
+          login/signup/forgot-password too, not just the authenticated
+          app — see the "accessible even from login/signup" requirement
+          this was built for. */}
+      <LocaleProvider>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+        {/* Root-level, not _shell-level: login/signup/forgot-password/etc.
+            are outside _shell and need somewhere to actually render a
+            toast too — previously nothing did, so e.g. "Invalid email or
+            password" on a failed login silently had no surface to show up
+            on at all. */}
+        <Toaster />
+      </LocaleProvider>
     </QueryClientProvider>
   );
 }

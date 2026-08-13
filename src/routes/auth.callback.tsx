@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useTranslation } from "@/i18n";
 
 export const Route = createFileRoute("/auth/callback")({
   validateSearch: (
@@ -28,6 +29,7 @@ export const Route = createFileRoute("/auth/callback")({
  * hanging on "Signing you in…" forever. */
 function AuthCallback() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { error, error_description } = Route.useSearch();
 
   useEffect(() => {
@@ -45,10 +47,10 @@ function AuthCallback() {
     return (
       <div className="grid min-h-screen place-items-center px-6 text-center">
         <div>
-          <div className="font-display text-2xl">Sign-in failed</div>
+          <div className="font-display text-2xl">{t.auth.callback.failedTitle}</div>
           <p className="mt-2 text-sm text-muted-foreground">{error_description ?? error}</p>
-          <Link to="/login" className="mt-4 inline-block text-primary hover:underline">
-            Back to login
+          <Link to="/login" className="mt-4 inline-block text-marvel hover:underline">
+            {t.auth.callback.backToLogin}
           </Link>
         </div>
       </div>
@@ -57,7 +59,7 @@ function AuthCallback() {
 
   return (
     <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">
-      Signing you in…
+      {t.auth.callback.signingIn}
     </div>
   );
 }

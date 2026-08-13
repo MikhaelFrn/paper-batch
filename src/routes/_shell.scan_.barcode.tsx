@@ -5,6 +5,8 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ComicCard } from "@/components/comic-card";
+import { ComicGrid } from "@/components/comic-grid";
+import { CenteredMessage } from "@/components/state-blocks";
 import { ImageDropZone } from "@/components/image-drop-zone";
 import { decodeBarcodeFromImage, useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { useCorrectBarcodeMatch, useLookupBarcode, useRecordBarcodeMatch } from "@/hooks/useBarcode";
@@ -12,14 +14,17 @@ import { useComicVineSearch } from "@/hooks/useComicVine";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useIssue } from "@/hooks/useIssues";
 import { cvIssueToComic, issueToComic } from "@/lib/comic-adapters";
+import { getKnownSafeErrorKind } from "@/lib/rate-limit-messages";
+import { useTranslation } from "@/i18n";
 
 const RATE_LIMIT_WARNING_THRESHOLD = 10;
 
 function RateLimitWarning({ remaining }: { remaining: number | null | undefined }) {
+  const { t } = useTranslation();
   if (remaining == null || remaining >= RATE_LIMIT_WARNING_THRESHOLD) return null;
   return (
     <p className="mb-3 text-center text-xs font-medium text-destructive">
-      Daily scans almost depleted — {remaining} lookup{remaining === 1 ? "" : "s"} left today.
+      {t.scan.almostDepleted(remaining)}
     </p>
   );
 }
@@ -46,10 +51,12 @@ function BarcodeQueryStep({
   onImported: (issueId: string) => void;
   onRescan: () => void;
 }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState(suggestedQuery);
   const debouncedQuery = useDebouncedValue(query, 400);
   const cvSearch = useComicVineSearch(debouncedQuery);
   const issues = cvSearch.data?.issues ?? [];
+  const cvErrorKind = getKnownSafeErrorKind(cvSearch.error);
 
   return (
     <div>
@@ -60,26 +67,29 @@ function BarcodeQueryStep({
           autoFocus
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search ComicVine…"
+          placeholder={t.scan.searchComicVinePlaceholder}
+          aria-label={t.scan.searchComicVinePlaceholder}
         />
       </div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
           {query.trim() === ""
-            ? "Type a title to search."
+            ? t.scan.typeATitleToSearch
             : cvSearch.isLoading
-              ? "Searching…"
-              : issues.length === 0
-                ? "No matches — try adjusting the search above."
-                : `${issues.length} result${issues.length === 1 ? "" : "s"}`}
+              ? t.scan.searching
+              : cvSearch.isError
+                ? (cvErrorKind ? t.errors[cvErrorKind] : t.scan.cvSearchFailed)
+                : issues.length === 0
+                  ? t.scan.noMatchesAdjustSearch
+                  : t.scan.resultsCount(issues.length)}
         </p>
-        <Button variant="outline" size="sm" onClick={onRescan}><RotateCcw className="h-4 w-4" />Scan again</Button>
+        <Button variant="outline" size="sm" onClick={onRescan}><RotateCcw className="h-4 w-4" />{t.scan.scanAgain}</Button>
       </div>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+      <ComicGrid>
         {issues.map((cv) => (
           <ComicCard key={cv.id} comic={cvIssueToComic(cv)} onImported={onImported} />
         ))}
-      </div>
+      </ComicGrid>
     </div>
   );
 }
@@ -102,19 +112,20 @@ function CachedMatchStep({
   issueId: string;
   onNotThisOne: () => void;
 }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const issueQ = useIssue(issueId);
 
   if (issueQ.isLoading) {
-    return <div className="py-20 text-center text-sm text-muted-foreground">Loading matched comic…</div>;
+    return <CenteredMessage message={t.common.loading} />;
   }
 
   if (!issueQ.data) {
     return (
       <div className="mx-auto max-w-md py-16 text-center">
-        <div className="font-medium">Couldn't load the comic this barcode was matched to.</div>
+        <div className="font-medium">{t.scan.couldntLoadMatchedComic}</div>
         <div className="mt-4 flex justify-center gap-2">
-          <Button variant="outline" onClick={onNotThisOne}><Search className="h-4 w-4" />Search instead</Button>
+          <Button variant="outline" onClick={onNotThisOne}><Search className="h-4 w-4" />{t.scan.searchInstead}</Button>
         </div>
       </div>
     );
@@ -123,12 +134,12 @@ function CachedMatchStep({
   return (
     <div className="mx-auto max-w-xs text-center">
       <p className="mb-4 text-sm text-muted-foreground">
-        Barcode {upc} was scanned before — matched to:
+        {t.scan.scannedBefore(upc)}
       </p>
       <ComicCard comic={issueToComic(issueQ.data)} />
       <div className="mt-6 flex justify-center gap-2">
-        <Button onClick={() => navigate({ to: "/comic/$id", params: { id: issueId } })}>Go to it</Button>
-        <Button variant="outline" onClick={onNotThisOne}>Not this one?</Button>
+        <Button onClick={() => navigate({ to: "/comic/$id", params: { id: issueId } })}>{t.scan.goToIt}</Button>
+        <Button variant="outline" onClick={onNotThisOne}>{t.scan.notThisOne}</Button>
       </div>
     </div>
   );
@@ -160,6 +171,7 @@ type Phase =
   | { kind: "error"; message: string };
 
 function ScanBarcodePage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [phase, setPhase] = useState<Phase>({ kind: "scanning" });
   const lookup = useLookupBarcode();
@@ -192,10 +204,14 @@ function ScanBarcodePage() {
         // The underlying error (e.g. a raw Postgres/PostgREST message) is
         // developer detail, not something to put in front of a friend using
         // the app — log it for debugging, show a generic message instead.
+        // Exception: a known quota/rate-limit message (UPCitemdb's daily
+        // cap, or ComicVine's if the "needs-query" step's search already
+        // hit it) is deliberately written to be shown as-is.
         console.error("Barcode lookup failed:", error);
+        const kind = getKnownSafeErrorKind(error);
         setPhase({
           kind: "error",
-          message: "Couldn't look up that barcode. Try again in a moment.",
+          message: kind ? t.errors[kind] : t.scan.barcodeLookupFailed,
         });
       },
     });
@@ -211,7 +227,7 @@ function ScanBarcodePage() {
     if (!code) {
       setPhase({
         kind: "error",
-        message: "Couldn't find a barcode in that photo — try a closer, sharper shot of just the barcode.",
+        message: t.scan.barcodeNoMatchInImage,
       });
       return;
     }
@@ -246,9 +262,9 @@ function ScanBarcodePage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Add by barcode"
-        title="Scan a comic"
-        description="Point your camera at the barcode on the back cover. Works best on collected editions and TPBs — single issues are hit-or-miss in barcode databases."
+        eyebrow={t.scan.addByBarcode}
+        title={t.scan.scanAComic}
+        description={t.scan.barcodePageDescription}
       />
 
       {phase.kind === "scanning" && (
@@ -263,38 +279,38 @@ function ScanBarcodePage() {
             <div className="pointer-events-none absolute inset-x-8 top-1/2 h-24 -translate-y-1/2 rounded-lg border-2 border-primary/80" />
             {scanner.status === "starting" && (
               <div className="absolute inset-0 grid place-items-center bg-black/60 text-sm text-white">
-                Starting camera…
+                {t.scan.startingCamera}
               </div>
             )}
             {scanner.status === "error" && (
               <div className="absolute inset-0 grid place-items-center bg-black/80 p-6 text-center text-sm text-white">
-                {scanner.error ?? "Couldn't access the camera."}
+                {scanner.error ?? t.scan.cameraAccessFailed}
               </div>
             )}
           </div>
           <p className="mt-3 text-center text-xs text-muted-foreground">
             <ScanBarcode className="mr-1 inline h-3.5 w-3.5" />
-            Hold the barcode steady inside the frame.
+            {t.scan.holdBarcodeSteady}
           </p>
 
           <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
             <div className="h-px flex-1 bg-border/60" />
-            or, if your camera's struggling
+            {t.scan.orIfCameraStruggling}
             <div className="h-px flex-1 bg-border/60" />
           </div>
-          <ImageDropZone onFile={handleImageFile} label="of the barcode here, or click to browse" />
+          <ImageDropZone onFile={handleImageFile} label={t.scan.dropBarcodeLabel} />
         </div>
       )}
 
       {phase.kind === "decoding-image" && (
         <div className="py-20 text-center text-sm text-muted-foreground">
-          Reading barcode from image…
+          {t.scan.decodingImage}
         </div>
       )}
 
       {phase.kind === "looking-up" && (
         <div className="py-20 text-center text-sm text-muted-foreground">
-          Looking up barcode {phase.upc}…
+          {t.scan.lookingUpBarcode(phase.upc)}
         </div>
       )}
 
@@ -302,8 +318,8 @@ function ScanBarcodePage() {
         <div className="mx-auto max-w-md py-16 text-center">
           <div className="text-sm text-destructive">{phase.message}</div>
           <div className="mt-4 flex justify-center gap-2">
-            <Button onClick={reset}><RotateCcw className="h-4 w-4" />Try again</Button>
-            <Button variant="outline" asChild><Link to="/search"><Search className="h-4 w-4" />Search manually</Link></Button>
+            <Button onClick={reset}><RotateCcw className="h-4 w-4" />{t.scan.tryAgain}</Button>
+            <Button variant="outline" asChild><Link to="/search"><Search className="h-4 w-4" />{t.scan.searchManually}</Link></Button>
           </div>
         </div>
       )}
@@ -311,13 +327,13 @@ function ScanBarcodePage() {
       {phase.kind === "not-found" && (
         <div className="mx-auto max-w-md py-16 text-center">
           <RateLimitWarning remaining={phase.rateLimitRemaining} />
-          <div className="font-medium">No product data for this barcode.</div>
+          <div className="font-medium">{t.scan.noProductData}</div>
           <p className="mt-1 text-sm text-muted-foreground">
-            This UPC isn't in the barcode database — common for single issues.
+            {t.scan.noProductDataDescription}
           </p>
           <div className="mt-4 flex justify-center gap-2">
-            <Button onClick={reset}><RotateCcw className="h-4 w-4" />Scan again</Button>
-            <Button variant="outline" asChild><Link to="/search"><Search className="h-4 w-4" />Search manually</Link></Button>
+            <Button onClick={reset}><RotateCcw className="h-4 w-4" />{t.scan.scanAgain}</Button>
+            <Button variant="outline" asChild><Link to="/search"><Search className="h-4 w-4" />{t.scan.searchManually}</Link></Button>
           </div>
         </div>
       )}
@@ -332,7 +348,7 @@ function ScanBarcodePage() {
 
       {phase.kind === "needs-query" && (
         <BarcodeQueryStep
-          description={`Matched a product listing for barcode ${phase.upc} — the search below is a cleaned-up guess at the title, not a chosen result. Edit it if it doesn't look right, then pick the correct issue.`}
+          description={t.scan.needsQueryDescription(phase.upc)}
           suggestedQuery={phase.suggestedQuery}
           rateLimitRemaining={phase.rateLimitRemaining}
           onImported={(issueId) => handleImported(phase.upc, issueId)}
@@ -342,7 +358,7 @@ function ScanBarcodePage() {
 
       {phase.kind === "correcting" && (
         <BarcodeQueryStep
-          description={`Fixing barcode ${phase.upc}'s match — search for the right issue and pick it below.`}
+          description={t.scan.correctingDescription(phase.upc)}
           suggestedQuery=""
           onImported={(issueId) => handleCorrected(phase.upc, issueId)}
           onRescan={reset}

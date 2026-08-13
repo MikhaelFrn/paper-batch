@@ -1,10 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getSupabaseServerClient } from "@/integrations/supabase/server-client";
 import { getSupabaseServiceClient } from "@/integrations/supabase/service-client";
 import { ISSUE_WITH_RELATIONS } from "./issues";
 import type { IssueWithRelations } from "@/lib/types";
 import { ServiceError } from "@/lib/types";
 import { unwrap } from "./_utils";
+import { requireAuthenticatedUser } from "./_serverUtils";
 
 // jimp must be loaded dynamically, not statically imported — turns out
 // createServerFn's client/server code-splitting doesn't fully protect a
@@ -18,14 +18,6 @@ import { unwrap } from "./_utils";
 // code that only ever runs on the server.
 async function loadJimp() {
   return import("jimp");
-}
-
-async function requireAuthenticatedUser(): Promise<void> {
-  const supabase = getSupabaseServerClient();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) {
-    throw new ServiceError("Not authenticated", { code: "UNAUTHENTICATED" });
-  }
 }
 
 /** Perceptual hash of an image via Jimp's built-in pHash plugin — robust to

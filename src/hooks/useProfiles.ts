@@ -49,8 +49,8 @@ export function useUploadMyAvatar() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (file: Blob) => {
-      const avatarUrl = await uploadMyAvatar(file);
-      return updateMyProfile({ avatar_url: avatarUrl });
+      const { url, objectKey } = await uploadMyAvatar(file);
+      return updateMyProfile({ avatar_url: url, avatar_object_key: objectKey });
     },
     onSuccess: (profile) => {
       qc.invalidateQueries({ queryKey: queryKeys.profiles.me() });

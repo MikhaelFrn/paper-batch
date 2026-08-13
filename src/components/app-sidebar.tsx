@@ -10,6 +10,7 @@ import {
   User,
   Settings,
   Zap,
+  Mail,
 } from "lucide-react";
 import {
   Sidebar,
@@ -23,28 +24,33 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { useTranslation } from "@/i18n";
 
-const main = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Inventory", url: "/inventory", icon: Library },
-  { title: "New Arrivals", url: "/new-arrivals", icon: Sparkles },
-  { title: "Search", url: "/search", icon: Search },
-  { title: "Scan a comic", url: "/scan", icon: ScanBarcode },
-];
-
-const collections = [
-  { title: "Lists", url: "/lists", icon: ListChecks },
-  { title: "Favorites", url: "/favorites", icon: Heart },
-];
-
-const account = [
-  { title: "Profile", url: "/profile", icon: User },
-  { title: "Settings", url: "/settings", icon: Settings },
-];
+const CONTACT_EMAIL = "comicvault.support@gmail.com";
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isActive = (url: string) => (url === "/" ? pathname === "/" : pathname.startsWith(url));
+  const { t } = useTranslation();
+
+  const main = [
+    { title: t.nav.dashboard, url: "/", icon: LayoutDashboard },
+    { title: t.nav.inventory, url: "/inventory", icon: Library },
+    { title: t.nav.newArrivals, url: "/new-arrivals", icon: Sparkles },
+    { title: t.nav.search, url: "/search", icon: Search },
+    { title: t.nav.scanComic, url: "/scan", icon: ScanBarcode },
+  ];
+
+  const collections = [
+    { title: t.nav.lists, url: "/lists", icon: ListChecks },
+    { title: t.nav.favorites, url: "/favorites", icon: Heart },
+  ];
+
+  const account = [
+    { title: t.nav.profile, url: "/profile", icon: User },
+    { title: t.nav.settings, url: "/settings", icon: Settings },
+  ];
 
   return (
     <Sidebar collapsible="icon">
@@ -61,13 +67,13 @@ export function AppSidebar() {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Discover</SidebarGroupLabel>
+          <SidebarGroupLabel>{t.nav.discover}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {main.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
-                    <Link to={item.url}>
+                    <Link to={item.url} aria-label={item.title}>
                       <item.icon />
                       <span>{item.title}</span>
                     </Link>
@@ -79,13 +85,13 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Collections</SidebarGroupLabel>
+          <SidebarGroupLabel>{t.nav.collections}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {collections.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
-                    <Link to={item.url}>
+                    <Link to={item.url} aria-label={item.title}>
                       <item.icon />
                       <span>{item.title}</span>
                     </Link>
@@ -97,13 +103,13 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Account</SidebarGroupLabel>
+          <SidebarGroupLabel>{t.nav.account}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {account.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
-                    <Link to={item.url}>
+                    <Link to={item.url} aria-label={item.title}>
                       <item.icon />
                       <span>{item.title}</span>
                     </Link>
@@ -115,8 +121,20 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter>
-
+      <SidebarFooter className="gap-2">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip={t.common.contact}>
+              <a href={`mailto:${CONTACT_EMAIL}`} aria-label={`${t.common.contact} — ${CONTACT_EMAIL}`}>
+                <Mail />
+                <span>{t.common.contact}</span>
+              </a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+        <div className="px-2 group-data-[collapsible=icon]:hidden">
+          <LanguageSwitcher className="w-full justify-center" />
+        </div>
       </SidebarFooter>
     </Sidebar>
   );

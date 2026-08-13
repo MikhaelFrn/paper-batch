@@ -47,9 +47,3 @@ export async function requireUserId(): Promise<string> {
   }
   return id;
 }
-
-/** Resolve the authenticated user's id, or `null` for guests. */
-export async function getCurrentUserId(): Promise<string | null> {
-  const { data } = await supabase.auth.getUser();
-  return data.user?.id ?? null;
-}
