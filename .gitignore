@@ -29,6 +29,10 @@ src/routeTree.gen.ts
 # Vercel
 .vercel
 
+# Legal draft — not ready for the repo until reviewed, see the file itself
+docs/legal-draft-privacy-and-terms.md
+docs/legal-draft-privacy-and-terms-fr.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

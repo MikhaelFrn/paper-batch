@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { requireUserId } from "./_utils";
 
-const AVATAR_BUCKET = "avatars";
+export const AVATAR_BUCKET = "avatars";
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
