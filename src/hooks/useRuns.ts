@@ -59,7 +59,7 @@ export function useCreateRunRelationship() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { sourceRunId: string; targetRunId: string; relationship: RelationshipType }) =>
-      createRunRelationship(input.sourceRunId, input.targetRunId, input.relationship),
+      createRunRelationship({ data: input }),
     onSuccess: (_result, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.runs.detail(vars.sourceRunId) });
       qc.invalidateQueries({ queryKey: queryKeys.runs.detail(vars.targetRunId) });
@@ -71,7 +71,7 @@ export function useDeleteRunRelationship() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { id: string; sourceRunId: string; targetRunId: string }) =>
-      deleteRunRelationship(input.id),
+      deleteRunRelationship({ data: { id: input.id } }),
     onSuccess: (_result, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.runs.detail(vars.sourceRunId) });
       qc.invalidateQueries({ queryKey: queryKeys.runs.detail(vars.targetRunId) });

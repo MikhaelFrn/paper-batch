@@ -26,7 +26,11 @@ function ComicCardBody({
   return (
     <>
       <div className="relative">
-        <ComicCover comic={comic} size={compact ? "sm" : "md"} className="transition-transform duration-300 group-hover:-translate-y-1 group-hover:shadow-2xl" />
+        <ComicCover
+          comic={comic}
+          size={compact ? "sm" : "md"}
+          className="transition-transform duration-300 group-hover:-translate-y-1 group-hover:shadow-2xl group-focus-visible:-translate-y-1 group-focus-visible:shadow-2xl"
+        />
         {extraBadge && (
           <div className="pointer-events-none absolute left-1.5 top-1.5">{extraBadge}</div>
         )}
@@ -52,7 +56,7 @@ function ComicCardBody({
         </div>
       </div>
       <div className="min-w-0">
-        <div className="truncate text-sm font-medium text-foreground group-hover:text-primary">
+        <div className="truncate text-sm font-medium text-foreground group-hover:text-primary group-focus-visible:text-primary">
           {comic.series} #{comic.issue}
         </div>
         <div className={cn("truncate text-xs text-muted-foreground", compact && "hidden")}>
@@ -101,7 +105,7 @@ function UnimportedComicCard({
       type="button"
       onClick={handleImport}
       disabled={importIssue.isPending}
-      className="group block w-full space-y-2 text-left outline-none disabled:opacity-60"
+      className="group block w-full space-y-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-60"
     >
       <ComicCardBody
         comic={comic}
@@ -140,7 +144,7 @@ export function ComicCard({
     <Link
       to="/comic/$id"
       params={{ id: comic.id }}
-      className="group block space-y-2 outline-none"
+      className="group block space-y-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
       <ComicCardBody comic={comic} compact={compact} />
     </Link>

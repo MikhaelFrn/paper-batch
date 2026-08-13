@@ -143,12 +143,6 @@ before or around that point.
 
 ## Pre-launch hygiene not yet raised
 
-- Secrets audit: confirmed live (grepped every env var reference in
-  `src`) that only `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`
-  are client-exposed by design; `SUPABASE_SERVICE_ROLE_KEY` and
-  `COMICVINE_KEY` are server-only reads, never `VITE_`-prefixed. Still
-  worth a real look at what actually ships in the client bundle once
-  hosted, rather than trusting the naming convention alone.
 - No accessibility pass has happened beyond one reactive `aria-hidden`
   fix — worth a real pass if this goes in front of people other than you.
 
@@ -257,3 +251,123 @@ before or around that point.
   Scope is intentionally narrow — pure functions only, no DOM, no live
   Supabase/ComicVine calls; e2e/integration testing is a separate,
   bigger lift not attempted here.
+
+## Security audit
+
+Worked through a security checklist covering secrets, RLS, injection,
+storage, auth, IDs, and CORS. One real finding, everything else confirmed
+clean — several by live testing against the real DB/bundle, not just
+reading code.
+
+- **Found and fixed: `runs`/`run_items`/`run_creators`/`run_relationships`
+  had no real write protection.** Their RLS policies granted INSERT/
+  UPDATE/DELETE to any authenticated user via bare `USING (true)` /
+  `WITH CHECK (true)`, with no ownership column to scope them by (unlike
+  `user_comics`/`lists`/favorites, which are correctly scoped to
+  `auth.uid()`). Confirmed live with a throwaway script: an authenticated
+  session could rename or delete an arbitrary run directly via the
+  anon-key client — not through the app's UI, straight through the raw
+  API, the exact thing RLS is supposed to stop. Fixed two ways together:
+  `createRunRelationship`/`deleteRunRelationship` (the only two writes to
+  this table family that went through the plain browser client) became
+  real `createServerFn` endpoints using the service-role client, matching
+  `analyzeVolume`'s existing pattern; then
+  `supabase/migrations/20260812000000_lock_down_run_write_policies.sql`
+  drops the permissive authenticated policies entirely, so these tables
+  are now public-read/service-role-write only — same posture as
+  `issues`/`volumes`/`series`/`publishers`/`creators`. **This migration
+  hasn't been run yet** — needs to be applied the same way as previous
+  ones (SQL editor). This does *not* add per-run ownership — any
+  authenticated user can still trigger a run mutation through the app
+  itself, same as before; it only closes the "bypass the app entirely via
+  devtools" hole. Whether runs should have real per-user ownership at all
+  (they're currently shared/global derived data, which conflicts with
+  "only the creator can edit their own run") is a separate product
+  decision, not something to decide unilaterally here.
+- **Everything else checked out, confirmed rather than assumed:**
+  - Secrets: grepped the actual built client bundle (`.vercel/output/static`,
+    not just source) for both the service-role and ComicVine key values,
+    the identifiers themselves, and any `process.env` reference — zero
+    hits. Confirms the dynamic-import pattern used for jimp/zxing/tesseract
+    is actually keeping server-only code out of the client chunk, not just
+    theoretically.
+  - Storage (avatars bucket): live-tested as a real authenticated user
+    (not service role) — uploading/deleting another user's avatar path is
+    blocked by RLS, uploading your own succeeds, public read works. The
+    policy itself only exists on the remote project, not in a local
+    migration file — worth a `supabase db pull` at some point so it's
+    reproducible from the repo, not just live on Supabase's dashboard.
+  - Every other table's RLS was read end-to-end from the schema: all
+    user-owned tables (`user_comics`, `favorite_*`, `lists`,
+    `list_items`, `list_members`) correctly scope by `auth.uid()` or list
+    membership; catalog tables (`issues`, `volumes`, `series`,
+    `publishers`, `creators`, `covers`, `issue_creators`) are
+    intentionally public-read/service-role-write only; `app_counters` has
+    zero policies at all and is only reachable through its
+    `SECURITY DEFINER` RPC, as designed.
+  - Auth guarding: every private route lives under the single `_shell`
+    layout route, gated by one `beforeLoad` that calls `auth.getUser()`
+    (re-validates the JWT server-side) rather than trusting a cookie —
+    there's no route that could accidentally skip the gate.
+  - Injection: no raw SQL surface exists at all (Supabase's client always
+    parameterizes real values); the one place user input feeds into
+    *filter syntax* rather than a value (search's `.or()` calls) already
+    strips the two characters that matter (`,` and `(`).
+  - IDs: every table's primary key is a real UUID; nothing in a route
+    param is a guessable sequential ID.
+  - `console.log`/`console.error` calls: none dump the user, session, or
+    a token — only generic error objects.
+  - CORS/CSRF (the side question): no explicit CORS config exists
+    anywhere in the app, which is actually correct — the app's own
+    server functions are same-origin by default (Nitro/TanStack Start
+    don't add permissive headers unless told to), so a third-party page
+    can't read responses from them at all. Supabase's own API being
+    cross-origin is by design; it's secured by RLS, not CORS — locking
+    Supabase's CORS to one origin wouldn't add real protection since a
+    non-browser client bypasses CORS entirely anyway. Checked the actual
+    `@supabase/ssr` source (not assumed): the auth cookie defaults to
+    `SameSite=Lax` and neither cookie adapter in this app overrides it,
+    which is real CSRF protection — a cross-site POST from another origin
+    won't carry the session cookie.
+  - Unbounded queries: nothing security-relevant (every broad `select("*")`
+    is already scoped by an owner/id filter or hits a genuinely small
+    table). `listMyCollection()` has no `.limit()` — not a security issue
+    since it's already scoped to `auth.uid()`, but worth watching when you
+    do the "2000 comics" stress test below, since that's real unpaginated
+    load.
+  - Bundle size: checked the actual client output, not the server
+    bundle — total client JS across every route is ~1.8MB uncompressed,
+    and the heavy libraries (zxing for barcode scanning) are already
+    route-split, only loading on the scan page rather than eagerly on
+    every page load.
+
+### What still needs a browser (can't verify these from here)
+
+- **RLS, empirically**: log in as two different accounts (or the same
+  account in two browser profiles) and try to read/update each other's
+  `user_comics`/lists/favorites directly via the browser console — this
+  session's live checks used a single real account plus disposable rows,
+  which proves the *policy* behaves correctly but isn't the same as a
+  true two-human click-through.
+- **Auth persistence**: logout, then refresh — are you actually logged
+  out? Direct-navigate to `/inventory` or `/profile` in a logged-out tab
+  and confirm the redirect to `/login` actually happens (code review says
+  it will, but it's worth seeing).
+- **Offline handling**: disconnect the network mid-session — does
+  anything crash outright, or does it degrade to an error message?
+- **Lighthouse**: a real page-load run (images, lazy-loading, actual
+  paint timing) — the bundle-size check above is necessary but not
+  sufficient.
+- **Keyboard-only navigation**: can you open/close every dialog and menu
+  without a mouse?
+- **Mobile**: iPhone SE / Pixel / iPad viewport sizes — this app hasn't
+  had a dedicated mobile pass.
+- **App-specific, from your own notes**:
+  - Search behavior across `Spider` / `Spider-` / `spider` / `spid` —
+    confirms debouncing and case-insensitivity feel right together, not
+    just in isolation.
+  - A search with a huge result set (`Batman`) — does the UI stay usable
+    with however many rows come back?
+  - Stress test: 100 lists, 2000 comics in the collection — does
+    everything (Inventory, especially, given the unpaginated
+    `listMyCollection()` above) stay responsive?

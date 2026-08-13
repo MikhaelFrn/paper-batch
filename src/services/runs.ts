@@ -459,25 +459,39 @@ export async function searchRunsForLinking(query: string, excludeRunId: string):
   );
 }
 
-export async function createRunRelationship(
-  sourceRunId: string,
-  targetRunId: string,
-  relationship: RelationshipType,
-): Promise<void> {
-  const { error } = await supabase
-    .from("run_relationships")
-    .insert({ source_run_id: sourceRunId, target_run_id: targetRunId, relationship });
-  // 23505: this exact (source, target, relationship) triple is already
-  // linked — not an error from the caller's point of view, same pattern as
-  // list_items' duplicate-add handling.
-  if (error && error.code !== "23505") {
-    throw new ServiceError("Failed to link runs", { cause: error });
-  }
-}
+// Both of the following are server functions, not plain browser-client
+// calls like the rest of this section — `run_relationships` (and
+// runs/run_items/run_creators generally) has no per-user ownership column,
+// so unlike user_comics/lists/favorites there's no RLS check that could
+// scope a direct insert/delete to "your own" row. Routing through
+// requireAuthenticatedUser() here is what actually gates these, now that
+// the matching RLS policies were locked to service-role-only (see the
+// "lock down run write policies" migration) — a plain authenticated
+// browser client no longer has table-level write access at all.
 
-export async function deleteRunRelationship(id: string): Promise<void> {
-  const { error } = await supabase.from("run_relationships").delete().eq("id", id);
-  if (error) {
-    throw new ServiceError("Failed to remove run relationship", { cause: error });
-  }
-}
+export const createRunRelationship = createServerFn({ method: "POST" })
+  .validator((input: { sourceRunId: string; targetRunId: string; relationship: RelationshipType }) => input)
+  .handler(async ({ data }): Promise<void> => {
+    await requireAuthenticatedUser();
+    const client = getSupabaseServiceClient();
+    const { error } = await client
+      .from("run_relationships")
+      .insert({ source_run_id: data.sourceRunId, target_run_id: data.targetRunId, relationship: data.relationship });
+    // 23505: this exact (source, target, relationship) triple is already
+    // linked — not an error from the caller's point of view, same pattern
+    // as list_items' duplicate-add handling.
+    if (error && error.code !== "23505") {
+      throw new ServiceError("Failed to link runs", { cause: error });
+    }
+  });
+
+export const deleteRunRelationship = createServerFn({ method: "POST" })
+  .validator((input: { id: string }) => input)
+  .handler(async ({ data }): Promise<void> => {
+    await requireAuthenticatedUser();
+    const client = getSupabaseServiceClient();
+    const { error } = await client.from("run_relationships").delete().eq("id", data.id);
+    if (error) {
+      throw new ServiceError("Failed to remove run relationship", { cause: error });
+    }
+  });

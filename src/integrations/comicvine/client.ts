@@ -101,14 +101,37 @@ const NON_ENGLISH_MARKET_PUBLISHERS = new Set([
   "panini brasil",
   "panini españa",
   "panini verlag",
+  "panini france",
   "planeta deagostini",
   "editorial ivrea",
   "editora abril",
+  // Found live searching "batman"/"spider-man" — a "Batman" search's top
+  // 15 volume matches included Editorial Novaro, Grupo Editorial Vid, ECC
+  // Ediciones, and Panini Brasil (all already listed) plus four more not
+  // yet caught: Ediciones Zinco and Norma Editorial (Spanish), Epucol
+  // (Colombian), and Editions Interpresse S.A. (French-Canadian) — any of
+  // which, sampled into the top MAX_VOLUMES_TO_SAMPLE, could surface a
+  // real but foreign-language back issue with a legitimate-but-unfamiliar
+  // numbering/date scheme in results for a plain English query.
+  "ediciones zinco",
+  "norma editorial",
+  "epucol",
+  "editions interpresse s.a.",
+  // Scandinavian/Dutch/French Spider-Man reprints, same discovery method.
+  "tm-semic",
+  "hjemmet",
+  "bladkompaniet a.s.",
+  "juniorpress bv",
+  "éditions de l'occident",
 ]);
 
+function isEnglishMarketPublisherName(name: string | null | undefined): boolean {
+  const n = name?.toLowerCase().trim();
+  return !n || !NON_ENGLISH_MARKET_PUBLISHERS.has(n);
+}
+
 function isEnglishMarketVolume(v: CvSearchVolume): boolean {
-  const publisherName = v.publisher?.name?.toLowerCase().trim();
-  return !publisherName || !NON_ENGLISH_MARKET_PUBLISHERS.has(publisherName);
+  return isEnglishMarketPublisherName(v.publisher?.name);
 }
 
 async function searchVolumesRaw(query: string, limit: number): Promise<CvSearchVolume[]> {
@@ -119,6 +142,50 @@ async function searchVolumesRaw(query: string, limit: number): Promise<CvSearchV
     limit: String(limit),
   });
   return results.filter(isEnglishMarketVolume);
+}
+
+// CV has no way to filter issues or volumes by publisher directly at the
+// list-endpoint level — the only path is resolving each issue's volume's
+// publisher individually. Ongoing weekly series recur across visits, so
+// cache across calls within this server process rather than re-resolving
+// the same handful of currently-active volumes every time. Shared between
+// New Arrivals and issue search's foreign-reprint filter below.
+const volumePublisherCache = new Map<string, { id: number; name: string } | null>();
+
+async function getVolumePublisher(
+  volumeDetailUrl: string,
+): Promise<{ id: number; name: string } | null> {
+  if (volumePublisherCache.has(volumeDetailUrl)) {
+    return volumePublisherCache.get(volumeDetailUrl) ?? null;
+  }
+  const detail = await cvGet<{ publisher: { id: number; name: string } | null }>(
+    volumeDetailUrl,
+    { field_list: "id,publisher" },
+  );
+  const publisher = detail.publisher
+    ? { id: detail.publisher.id, name: detail.publisher.name }
+    : null;
+  volumePublisherCache.set(volumeDetailUrl, publisher);
+  return publisher;
+}
+
+// Unlike searchVolumesRaw, CV's issue search results carry no publisher
+// field at all (confirmed live against the real API — field_list asks for
+// it, the response just omits it for resources=issue) — so filtering out
+// foreign-market reprints here needs a per-volume lookup instead of a
+// field already on the result. Cheap in practice: raw issue-relevance
+// search commonly collapses onto a small handful of volumes (see
+// searchIssuesAndVolumes below), and getVolumePublisher caches across
+// calls, so a search rarely costs more than one or two extra requests.
+async function filterEnglishMarketIssues(issues: CvSearchIssue[]): Promise<CvSearchIssue[]> {
+  const volumeUrls = [
+    ...new Set(issues.map((i) => i.volume?.api_detail_url).filter((u): u is string => !!u)),
+  ];
+  const publishers = await Promise.all(volumeUrls.map((url) => getVolumePublisher(url)));
+  const excludedVolumeUrls = new Set(
+    volumeUrls.filter((_, i) => !isEnglishMarketPublisherName(publishers[i]?.name)),
+  );
+  return issues.filter((i) => !i.volume || !excludedVolumeUrls.has(i.volume.api_detail_url));
 }
 
 const VOLUME_ISSUE_FIELDS =
@@ -249,11 +316,19 @@ export async function searchIssuesAndVolumes(
     INITIAL_ISSUES_PER_VOLUME,
   );
 
-  const seenIds = new Set(issueResults.map((i) => i.id));
+  // volumeIssues is already clean (sampled only from volumeResults, which
+  // searchVolumesRaw already filtered) — but issueResults comes straight
+  // from CV's raw relevance search with no filtering at all, which is
+  // exactly how a foreign-market reprint (weird issue numbers, a future
+  // cover date, non-English title) could show up in results for a query
+  // as plain as "batman".
+  const cleanIssueResults = await filterEnglishMarketIssues(issueResults);
+
+  const seenIds = new Set(cleanIssueResults.map((i) => i.id));
   const extra = volumeIssues.filter((i) => !seenIds.has(i.id));
 
   return {
-    issues: [...issueResults, ...extra],
+    issues: [...cleanIssueResults, ...extra],
     volumes: volumeResults,
     sampledVolumeIds,
     nextOffset: INITIAL_ISSUES_PER_VOLUME,
@@ -309,30 +384,6 @@ const NEW_ARRIVALS_PUBLISHER_NAMES = new Map(
 
 export interface CvRecentIssue extends CvSearchIssue {
   publisherName: string;
-}
-
-// CV has no way to filter issues or volumes by publisher directly — the
-// only path is resolving each issue's volume's publisher individually.
-// Ongoing weekly series recur across visits, so cache across calls within
-// this server process rather than re-resolving the same handful of
-// currently-active volumes every time.
-const volumePublisherCache = new Map<string, { id: number; name: string } | null>();
-
-async function getVolumePublisher(
-  volumeDetailUrl: string,
-): Promise<{ id: number; name: string } | null> {
-  if (volumePublisherCache.has(volumeDetailUrl)) {
-    return volumePublisherCache.get(volumeDetailUrl) ?? null;
-  }
-  const detail = await cvGet<{ publisher: { id: number; name: string } | null }>(
-    volumeDetailUrl,
-    { field_list: "id,publisher" },
-  );
-  const publisher = detail.publisher
-    ? { id: detail.publisher.id, name: detail.publisher.name }
-    : null;
-  volumePublisherCache.set(volumeDetailUrl, publisher);
-  return publisher;
 }
 
 const RECENT_ISSUE_FIELDS =
