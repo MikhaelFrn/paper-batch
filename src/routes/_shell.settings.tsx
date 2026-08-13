@@ -17,6 +17,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useDeleteMyAccount } from "@/hooks/useAuth";
+import { useTranslation } from "@/i18n";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_shell/settings")({
@@ -32,39 +33,42 @@ export const Route = createFileRoute("/_shell/settings")({
 });
 
 function Settings() {
+  const { t } = useTranslation();
   const [theme, setTheme] = useState("dark");
   const navigate = useNavigate();
   const deleteAccount = useDeleteMyAccount();
 
+  const themeLabel = (v: string) => (v === "light" ? t.settings.light : t.settings.dark);
+
   const handleDeleteAccount = () => {
     deleteAccount.mutate(undefined, {
       onSuccess: () => navigate({ to: "/goodbye" }),
-      onError: () => toast.error("Couldn't delete your account. Try again in a moment."),
+      onError: () => toast.error(t.settings.deleteFailed),
     });
   };
 
   return (
     <div>
-      <PageHeader eyebrow="Preferences" title="Settings" description="Theme and account preferences." />
+      <PageHeader eyebrow={t.settings.eyebrow} title={t.settings.title} description={t.settings.description} />
 
       <div className="grid gap-6 max-w-3xl">
         <Card className="border-border/60">
-          <CardHeader><CardTitle>Appearance</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{t.settings.appearance}</CardTitle></CardHeader>
           <CardContent>
-            <Label className="text-xs uppercase tracking-widest text-muted-foreground">Theme</Label>
-            <RadioGroup value={theme} onValueChange={(v) => { setTheme(v); document.documentElement.classList.toggle("light", v === "light"); toast.success(`Switched to ${v} theme`); }} className="mt-3 grid grid-cols-2 gap-3">
+            <Label className="text-xs uppercase tracking-widest text-muted-foreground">{t.settings.theme}</Label>
+            <RadioGroup value={theme} onValueChange={(v) => { setTheme(v); document.documentElement.classList.toggle("light", v === "light"); toast.success(t.settings.themeSwitched(themeLabel(v))); }} className="mt-3 grid grid-cols-2 gap-3">
               <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-card p-4 has-[[data-state=checked]]:border-primary">
                 <RadioGroupItem value="dark" />
                 <div>
-                  <div className="font-medium">Dark</div>
-                  <div className="text-xs text-muted-foreground">Ink black, Marvel red, DC blue.</div>
+                  <div className="font-medium">{t.settings.dark}</div>
+                  <div className="text-xs text-muted-foreground">{t.settings.darkDescription}</div>
                 </div>
               </label>
               <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-card p-4 has-[[data-state=checked]]:border-primary">
                 <RadioGroupItem value="light" />
                 <div>
-                  <div className="font-medium">Light</div>
-                  <div className="text-xs text-muted-foreground">Paper white, softer accents.</div>
+                  <div className="font-medium">{t.settings.light}</div>
+                  <div className="text-xs text-muted-foreground">{t.settings.lightDescription}</div>
                 </div>
               </label>
             </RadioGroup>
@@ -72,28 +76,28 @@ function Settings() {
         </Card>
 
         <Card className="border-destructive/40">
-          <CardHeader><CardTitle className="text-destructive">Danger zone</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-destructive">{t.settings.dangerZone}</CardTitle></CardHeader>
           <CardContent className="flex items-center justify-between gap-4">
-            <div className="text-sm text-muted-foreground">Delete your account and all collection data. This cannot be undone.</div>
+            <div className="text-sm text-muted-foreground">{t.settings.deleteAccountDescription}</div>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive">Delete account</Button>
+                <Button variant="destructive">{t.settings.deleteAccount}</Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogTitle>{t.settings.areYouSure}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This is irreversible and you will need to create another account to continue using Comic Vault.
+                    {t.settings.deleteAccountConfirm}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel>{t.settings.cancel}</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleDeleteAccount}
                     disabled={deleteAccount.isPending}
                     className={buttonVariants({ variant: "destructive" })}
                   >
-                    {deleteAccount.isPending ? "Deleting…" : "Delete account"}
+                    {deleteAccount.isPending ? t.settings.deleting : t.settings.deleteAccount}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

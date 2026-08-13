@@ -4,7 +4,7 @@ import { AuthShell } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Toaster } from "@/components/ui/sonner";
+import { useTranslation } from "@/i18n";
 import { toast } from "sonner";
 import { updateAuthUser } from "@/services/auth";
 
@@ -31,23 +31,22 @@ export const Route = createFileRoute("/reset-password")({
 
 function ResetPassword() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (
-    e: React.FormEvent<HTMLFormElement>,
-  ) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (password.length < 8) {
-      toast.error("Password must be at least 8 characters.");
+      toast.error(t.auth.resetPassword.tooShort);
       return;
     }
 
     if (password !== confirmPassword) {
-      toast.error("Passwords do not match.");
+      toast.error(t.auth.resetPassword.mismatch);
       return;
     }
 
@@ -58,77 +57,55 @@ function ResetPassword() {
         password,
       });
 
-      toast.success("Your password has been updated.");
+      toast.success(t.auth.resetPassword.success);
 
       navigate({ to: "/login" });
     } catch {
-      toast.error("Unable to update your password.");
+      toast.error(t.auth.resetPassword.error);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <>
-      <AuthShell
-        title="Choose a new password"
-        subtitle="Enter your new password below."
-        footer={
-          <Link
-            to="/login"
-            className="text-primary hover:underline"
-          >
-            Back to sign in
-          </Link>
-        }
-      >
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-4"
-        >
-          <div>
-            <Label htmlFor="password">
-              New password
-            </Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) =>
-                setPassword(e.target.value)
-              }
-              required
-            />
-          </div>
+    <AuthShell
+      title={t.auth.resetPassword.title}
+      subtitle={t.auth.resetPassword.subtitle}
+      footer={
+        <Link to="/login" className="text-primary hover:underline">
+          {t.auth.resetPassword.backToSignIn}
+        </Link>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <Label htmlFor="password">{t.auth.resetPassword.newPasswordLabel}</Label>
+          <Input
+            id="password"
+            type="password"
+            placeholder={t.auth.resetPassword.passwordPlaceholder}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
 
-          <div>
-            <Label htmlFor="confirmPassword">
-              Confirm password
-            </Label>
-            <Input
-              id="confirmPassword"
-              type="password"
-              placeholder="••••••••"
-              value={confirmPassword}
-              onChange={(e) =>
-                setConfirmPassword(e.target.value)
-              }
-              required
-            />
-          </div>
+        <div>
+          <Label htmlFor="confirmPassword">{t.auth.resetPassword.confirmPasswordLabel}</Label>
+          <Input
+            id="confirmPassword"
+            type="password"
+            placeholder={t.auth.resetPassword.passwordPlaceholder}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+          />
+        </div>
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={loading}
-          >
-            {loading ? "Updating..." : "Update password"}
-          </Button>
-        </form>
-      </AuthShell>
-
-      <Toaster />
-    </>
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? t.auth.resetPassword.submitting : t.auth.resetPassword.submit}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

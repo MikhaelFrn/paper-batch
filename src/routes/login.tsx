@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useState } from "react";
 import { useSignIn, useSignInWithGoogle } from "@/hooks/useAuth";
+import { useTranslation } from "@/i18n";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
@@ -26,13 +27,14 @@ export const Route = createFileRoute("/login")({
 function Login() {
   const navigate = useNavigate();
   const { redirect: redirectTo } = Route.useSearch();
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const login = useSignIn();
   const signInWithGoogle = useSignInWithGoogle();
   const handleGoogleSignIn = () => {
     signInWithGoogle.mutate(undefined, {
-      onError: () => toast.error("Couldn't start Google sign-in."),
+      onError: () => toast.error(t.auth.login.googleError),
     });
   };
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
@@ -47,27 +49,27 @@ function Login() {
         navigate({ to: redirectTo || "/" });
 
     } catch (error) {
-        toast.error("Invalid email or password.");
+        toast.error(t.auth.login.invalidCredentials);
     }
   };
 
   return (
     <AuthShell
-      title="Welcome back"
-      subtitle="Sign in to open your vault."
-      footer={<>New here? <Link to="/signup" className="text-primary hover:underline">Create an account</Link></>}
+      title={t.auth.login.title}
+      subtitle={t.auth.login.subtitle}
+      footer={<>{t.auth.login.noAccount} <Link to="/signup" className="text-primary hover:underline">{t.auth.login.createAccount}</Link></>}
     >
       <form onSubmit={ handleSubmit } className="space-y-4">
-        <div><Label>Email</Label><Input type="email" placeholder="peter@dailybugle.com" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+        <div><Label htmlFor="login-email">{t.auth.login.emailLabel}</Label><Input id="login-email" type="email" placeholder={t.auth.login.emailPlaceholder} value={email} onChange={(e) => setEmail(e.target.value)} /></div>
         <div>
           <div className="flex items-center justify-between">
-            <Label>Password</Label>
-            <Link to="/forgot-password" className="text-xs text-muted-foreground hover:text-primary">Forgot?</Link>
+            <Label htmlFor="login-password">{t.auth.login.passwordLabel}</Label>
+            <Link to="/forgot-password" className="text-xs text-muted-foreground hover:text-primary">{t.auth.login.forgot}</Link>
           </div>
-          <Input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)}/>
+          <Input id="login-password" type="password" placeholder={t.auth.login.passwordPlaceholder} value={password} onChange={(e) => setPassword(e.target.value)}/>
         </div>
-        <label className="flex items-center gap-2 text-sm"><Checkbox defaultChecked /> Keep me signed in</label>
-        <Button type="submit" className="w-full" disabled={login.isPending} onChange={(e) => setPassword(e.target.value)}>{login.isPending ? "Signing in..." : "Sign in"}</Button>
+        <label className="flex items-center gap-2 text-sm"><Checkbox defaultChecked /> {t.auth.login.keepSignedIn}</label>
+        <Button type="submit" className="w-full" disabled={login.isPending} onChange={(e) => setPassword(e.target.value)}>{login.isPending ? t.auth.login.submitting : t.auth.login.submit}</Button>
         <Button
           type="button"
           variant="outline"
@@ -75,7 +77,7 @@ function Login() {
           disabled={signInWithGoogle.isPending}
           onClick={handleGoogleSignIn}
         >
-          {signInWithGoogle.isPending ? "Redirecting…" : "Continue with Google"}
+          {signInWithGoogle.isPending ? t.auth.login.googleRedirecting : t.auth.login.googleButton}
         </Button>
       </form>
     </AuthShell>

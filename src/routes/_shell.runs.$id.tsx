@@ -34,6 +34,7 @@ import { useFavoriteRuns, useToggleFavoriteRun } from "@/hooks/useFavorites";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { issueToComic } from "@/lib/comic-adapters";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/i18n";
 import type { RelationshipType } from "@/lib/types";
 
 export const Route = createFileRoute("/_shell/runs/$id")({
@@ -46,26 +47,18 @@ export const Route = createFileRoute("/_shell/runs/$id")({
   component: RunDetail,
 });
 
-// Display label from each side of a stored (source, relationship, target)
-// row — storage convention is "source [relationship] target" from the
-// older/first-linked run's point of view (see docs/comicvine-and-runs.md).
-// Not symmetric for every type: continuation/required_before/
-// recommended_before/inspired_by read differently depending on which end
-// you're standing on; the rest (tie_in/concurrent/alternate_take) don't
-// imply an order, so both sides show the same word.
-const RELATIONSHIP_LABELS: Record<RelationshipType, { outgoing: string; incoming: string }> = {
-  continuation: { outgoing: "Continued by", incoming: "Continues" },
-  required_before: { outgoing: "Must be read before", incoming: "Requires reading first" },
-  recommended_before: { outgoing: "Recommended before", incoming: "Recommended reading first" },
-  tie_in: { outgoing: "Tie-in with", incoming: "Tie-in with" },
-  concurrent: { outgoing: "Concurrent with", incoming: "Concurrent with" },
-  inspired_by: { outgoing: "Inspired by", incoming: "Inspired" },
-  alternate_take: { outgoing: "Alternate take of", incoming: "Alternate take of" },
-};
-
-const RELATIONSHIP_TYPES = Object.keys(RELATIONSHIP_LABELS) as RelationshipType[];
+const RELATIONSHIP_TYPES: RelationshipType[] = [
+  "continuation",
+  "required_before",
+  "recommended_before",
+  "tie_in",
+  "concurrent",
+  "inspired_by",
+  "alternate_take",
+];
 
 function LinkRunDialog({ runId }: { runId: string }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, 300);
@@ -80,10 +73,10 @@ function LinkRunDialog({ runId }: { runId: string }) {
       { sourceRunId: runId, targetRunId, relationship },
       {
         onSuccess: () => {
-          toast.success(`Linked to ${targetName}.`);
+          toast.success(t.runDetail.linkedTo(targetName));
           setQuery("");
         },
-        onError: () => toast.error(`Couldn't link to ${targetName}.`),
+        onError: () => toast.error(t.runDetail.linkToFailed(targetName)),
       },
     );
   };
@@ -92,27 +85,31 @@ function LinkRunDialog({ runId }: { runId: string }) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          <Link2 className="h-4 w-4" />Link to another run
+          <Link2 className="h-4 w-4" />{t.runDetail.linkToAnotherRun}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Link to another run</DialogTitle>
+          <DialogTitle>{t.runDetail.linkToAnotherRun}</DialogTitle>
           <DialogDescription>
-            Cross-volume connections (a story continuing elsewhere, a tie-in, a recommended
-            follow-up) — this is a manual call, not something derived automatically.
+            {t.runDetail.linkDialogDescription}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <Label>Search runs by name</Label>
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search runs…" />
+          <Label htmlFor="run-link-search">{t.runDetail.searchRunsByName}</Label>
+          <Input
+            id="run-link-search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t.runDetail.searchRunsPlaceholder}
+          />
           <div className="max-h-72 space-y-2 overflow-y-auto">
             {debouncedQuery.trim().length === 0 ? (
-              <p className="text-sm text-muted-foreground">Start typing to find a run.</p>
+              <p className="text-sm text-muted-foreground">{t.runDetail.startTypingToFindRun}</p>
             ) : candidates.isLoading ? (
-              <p className="text-sm text-muted-foreground">Searching…</p>
+              <p className="text-sm text-muted-foreground">{t.runDetail.searching}</p>
             ) : (candidates.data ?? []).length === 0 ? (
-              <p className="text-sm text-muted-foreground">No matching runs.</p>
+              <p className="text-sm text-muted-foreground">{t.runDetail.noMatchingRuns}</p>
             ) : (
               (candidates.data ?? []).map((r) => (
                 <div
@@ -128,12 +125,12 @@ function LinkRunDialog({ runId }: { runId: string }) {
                       }
                     >
                       <SelectTrigger className="h-8 w-44 text-xs">
-                        <SelectValue placeholder="Relationship…" />
+                        <SelectValue placeholder={t.runDetail.relationshipPlaceholder} />
                       </SelectTrigger>
                       <SelectContent>
                         {RELATIONSHIP_TYPES.map((type) => (
                           <SelectItem key={type} value={type}>
-                            {RELATIONSHIP_LABELS[type].outgoing}
+                            {t.runDetail.relationships[type].outgoing}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -143,7 +140,7 @@ function LinkRunDialog({ runId }: { runId: string }) {
                       disabled={!chosenType[r.id] || createRelationship.isPending}
                       onClick={() => handleLink(r.id, r.name)}
                     >
-                      Link
+                      {t.runDetail.link}
                     </Button>
                   </div>
                 </div>
@@ -157,6 +154,7 @@ function LinkRunDialog({ runId }: { runId: string }) {
 }
 
 function RunDetail() {
+  const { t } = useTranslation();
   const { id } = Route.useParams();
   const runQ = useRun(id);
   const deleteRelationship = useDeleteRunRelationship();
@@ -164,18 +162,18 @@ function RunDetail() {
   const toggleFavoriteRun = useToggleFavoriteRun();
 
   if (runQ.isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading run…</p>;
+    return <p className="text-sm text-muted-foreground">{t.runDetail.loadingRun}</p>;
   }
   const run = runQ.data;
   if (!run) {
-    return <p className="text-sm text-muted-foreground">Run not found.</p>;
+    return <p className="text-sm text-muted-foreground">{t.runDetail.runNotFound}</p>;
   }
 
   const isFavorite = (favoriteRuns.data ?? []).some((r) => r.id === run.id);
   const handleToggleFavorite = () => {
     toggleFavoriteRun.mutate(
       { runId: run.id, isFavorite },
-      { onError: () => toast.error("Couldn't update favorite.") },
+      { onError: () => toast.error(t.runDetail.updateFavoriteFailed) },
     );
   };
 
@@ -188,14 +186,14 @@ function RunDetail() {
     ...run.outgoing_relationships.map((rel) => ({
       relId: rel.id,
       otherRun: rel.target_run,
-      label: RELATIONSHIP_LABELS[rel.relationship].outgoing,
+      label: t.runDetail.relationships[rel.relationship].outgoing,
       sourceRunId: run.id,
       targetRunId: rel.target_run_id,
     })),
     ...run.incoming_relationships.map((rel) => ({
       relId: rel.id,
       otherRun: rel.source_run,
-      label: RELATIONSHIP_LABELS[rel.relationship].incoming,
+      label: t.runDetail.relationships[rel.relationship].incoming,
       sourceRunId: rel.source_run_id,
       targetRunId: run.id,
     })),
@@ -205,8 +203,8 @@ function RunDetail() {
     deleteRelationship.mutate(
       { id: relId, sourceRunId, targetRunId },
       {
-        onSuccess: () => toast.success(`Removed link to ${name}.`),
-        onError: () => toast.error(`Couldn't remove link to ${name}.`),
+        onSuccess: () => toast.success(t.runDetail.removedLinkTo(name)),
+        onError: () => toast.error(t.runDetail.removeLinkFailed(name)),
       },
     );
   };
@@ -214,9 +212,9 @@ function RunDetail() {
   return (
     <div>
       <PageHeader
-        eyebrow={[run.start_year, run.end_year].filter(Boolean).join("–") || "Run"}
+        eyebrow={[run.start_year, run.end_year].filter(Boolean).join("–") || t.runDetail.run}
         title={run.name}
-        description={`${run.run_items.length} issue${run.run_items.length === 1 ? "" : "s"} · ${Math.round((run.confidence ?? 0) * 100)}% confidence${writers ? ` · ${writers}` : ""}`}
+        description={`${t.common.issuesCount(run.run_items.length)} · ${t.volumeDetail.confidence(Math.round((run.confidence ?? 0) * 100))}${writers ? ` · ${writers}` : ""}`}
         actions={
           <>
             <Button
@@ -226,22 +224,23 @@ function RunDetail() {
               disabled={toggleFavoriteRun.isPending}
             >
               <Heart className={cn("h-4 w-4", isFavorite && "fill-current")} />
-              {isFavorite ? "Favorited" : "Favorite"}
+              {isFavorite ? t.runDetail.favorited : t.runDetail.favorite}
             </Button>
-            <Badge variant={run.status === "verified" ? "default" : "outline"}>{run.status}</Badge>
+            <Badge variant={run.status === "verified" ? "default" : "outline"}>
+              {run.status === "verified" ? t.common.runStatus.verified : t.common.runStatus.draft}
+            </Badge>
           </>
         }
       />
 
       <section className="mb-10">
         <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 className="font-display text-xl tracking-wide">Related runs</h2>
+          <h2 className="font-display text-xl tracking-wide">{t.runDetail.relatedRuns}</h2>
           <LinkRunDialog runId={run.id} />
         </div>
         {relatedRuns.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No related runs yet — link this to a continuation, tie-in, or recommended follow-up
-            in another volume.
+            {t.runDetail.noRelatedRuns}
           </p>
         ) : (
           <div className="space-y-2">
@@ -262,7 +261,8 @@ function RunDetail() {
                 <button
                   type="button"
                   onClick={() => handleUnlink(r.relId, r.sourceRunId, r.targetRunId, r.otherRun!.name)}
-                  title="Remove link"
+                  title={t.runDetail.removeLinkTo(r.otherRun!.name)}
+                  aria-label={t.runDetail.removeLinkTo(r.otherRun!.name)}
                   className="shrink-0 text-muted-foreground hover:text-destructive"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -276,7 +276,7 @@ function RunDetail() {
       <Separator className="mb-6" />
 
       <section>
-        <h2 className="font-display mb-3 text-xl tracking-wide">Issues</h2>
+        <h2 className="font-display mb-3 text-xl tracking-wide">{t.runDetail.issuesHeading}</h2>
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
           {run.run_items
             .slice()

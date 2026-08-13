@@ -5,7 +5,8 @@ import { ComicCard, PublisherBadge } from "@/components/comic-card";
 import { Button } from "@/components/ui/button";
 import { useNewArrivals } from "@/hooks/useComicVine";
 import { cvIssueToComic } from "@/lib/comic-adapters";
-import { getKnownSafeErrorMessage } from "@/lib/rate-limit-messages";
+import { getKnownSafeErrorKind } from "@/lib/rate-limit-messages";
+import { useTranslation } from "@/i18n";
 
 export const Route = createFileRoute("/_shell/new-arrivals")({
   head: () => ({
@@ -20,6 +21,7 @@ export const Route = createFileRoute("/_shell/new-arrivals")({
 });
 
 function NewArrivals() {
+  const { t, locale } = useTranslation();
   const [pub, setPub] = useState<string | null>(null);
   const arrivals = useNewArrivals();
   const issues = arrivals.data ?? [];
@@ -32,15 +34,17 @@ function NewArrivals() {
     .filter((i) => (pub ? i.publisherName === pub : true))
     .map((i) => cvIssueToComic(i, i.publisherName));
 
+  const errorKind = getKnownSafeErrorKind(arrivals.error);
+
   return (
     <div>
       <PageHeader
-        eyebrow="This week"
-        title="New Arrivals"
-        description="Latest issues from Marvel, DC, Image, and more. Click any cover to add it to your collection."
+        eyebrow={t.newArrivals.eyebrow}
+        title={t.newArrivals.title}
+        description={t.newArrivals.description}
       />
       <div className="mb-6 flex flex-wrap gap-2">
-        <Button size="sm" variant={!pub ? "default" : "outline"} onClick={() => setPub(null)}>All</Button>
+        <Button size="sm" variant={!pub ? "default" : "outline"} onClick={() => setPub(null)}>{t.newArrivals.all}</Button>
         {publishers.map((name) => (
           <Button key={name} size="sm" variant={pub === name ? "default" : "outline"} onClick={() => setPub(name)}>
             <PublisherBadge publisher={name} />
@@ -49,16 +53,18 @@ function NewArrivals() {
       </div>
 
       <div className="mb-4 text-xs uppercase tracking-widest text-muted-foreground">
-        Week of {new Date().toLocaleDateString(undefined, { month: "long", day: "numeric" })}
+        {t.newArrivals.weekOf(
+          new Date().toLocaleDateString(locale === "fr" ? "fr-CA" : "en-US", { month: "long", day: "numeric" }),
+        )}
       </div>
       {arrivals.isLoading ? (
-        <div className="py-10 text-sm text-muted-foreground">Loading new arrivals…</div>
+        <div className="py-10 text-sm text-muted-foreground">{t.newArrivals.loading}</div>
       ) : arrivals.isError ? (
         <div className="py-10 text-sm text-destructive">
-          {getKnownSafeErrorMessage(arrivals.error) ?? "Couldn't load new arrivals — try again in a moment."}
+          {errorKind ? t.errors[errorKind] : t.newArrivals.loadFailed}
         </div>
       ) : weekly.length === 0 ? (
-        <div className="py-10 text-sm text-muted-foreground">No new arrivals found for this week.</div>
+        <div className="py-10 text-sm text-muted-foreground">{t.newArrivals.none}</div>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
           {weekly.map((c) => (

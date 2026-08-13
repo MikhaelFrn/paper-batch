@@ -46,6 +46,7 @@ import { issueToComic, normalizeSeriesName } from "@/lib/comic-adapters";
 import type { Comic } from "@/lib/comic-adapters";
 import type { IssueWithRelations } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/i18n";
 
 export const Route = createFileRoute("/_shell/comic/$id")({
   head: () => ({
@@ -81,11 +82,12 @@ interface CreatorRef {
 function pickCreatorRefs(
   issueCreators: IssueWithRelations["issue_creators"],
   matcher: (role: string) => boolean,
+  unknownLabel: string,
 ): CreatorRef[] {
   const byId = new Map<string, CreatorRef>();
   for (const ic of issueCreators) {
     if (!ic.creator || !matcher((ic.role ?? "").toLowerCase())) continue;
-    const name = [ic.creator.first_name, ic.creator.last_name].filter(Boolean).join(" ").trim() || "Unknown";
+    const name = [ic.creator.first_name, ic.creator.last_name].filter(Boolean).join(" ").trim() || unknownLabel;
     byId.set(ic.creator.id, { id: ic.creator.id, name });
   }
   return [...byId.values()];
@@ -113,6 +115,7 @@ function CreatorLinks({
   showFavorite?: boolean;
   className?: string;
 }) {
+  const { t } = useTranslation();
   if (creators.length === 0) return <>—</>;
   return (
     <>
@@ -128,7 +131,7 @@ function CreatorLinks({
               <button
                 type="button"
                 onClick={() => onToggleFavorite?.(creator, isFavorite)}
-                aria-label={isFavorite ? `Remove ${creator.name} from favorite creators` : `Favorite ${creator.name}`}
+                aria-label={isFavorite ? t.comicDetail.favoriteCreatorRemove(creator.name) : t.comicDetail.favoriteCreatorAdd(creator.name)}
                 className={cn(
                   "ml-1 transition-colors",
                   isFavorite ? "text-primary" : "text-muted-foreground/40 hover:text-primary",
@@ -149,6 +152,7 @@ function CreatorLinks({
  * see but not add to a shared list (owners/editors only, enforced by RLS
  * regardless, but no point offering an action that'll just fail). */
 function AddToListMenu({ issueId }: { issueId: string }) {
+  const { t } = useTranslation();
   const lists = useMyLists();
   const addToList = useAddIssueToList();
   const addableLists = (lists.data ?? []).filter((l) => l.myRole !== "viewer");
@@ -157,8 +161,8 @@ function AddToListMenu({ issueId }: { issueId: string }) {
     addToList.mutate(
       { listId, issueId },
       {
-        onSuccess: () => toast.success(`Added to ${listName}`),
-        onError: () => toast.error(`Couldn't add to ${listName}`),
+        onSuccess: () => toast.success(t.comicDetail.addedToList(listName)),
+        onError: () => toast.error(t.comicDetail.addToListFailed(listName)),
       },
     );
   };
@@ -167,12 +171,12 @@ function AddToListMenu({ issueId }: { issueId: string }) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" disabled={addToList.isPending}>
-          <ListPlus className="h-4 w-4" />Add to list
+          <ListPlus className="h-4 w-4" />{t.comicDetail.addToList}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
         {addableLists.length === 0 ? (
-          <DropdownMenuItem disabled>No lists yet</DropdownMenuItem>
+          <DropdownMenuItem disabled>{t.comicDetail.noListsYet}</DropdownMenuItem>
         ) : (
           addableLists.map((l) => (
             <DropdownMenuItem key={l.id} onClick={() => handleAdd(l.id, l.name)}>
@@ -182,7 +186,7 @@ function AddToListMenu({ issueId }: { issueId: string }) {
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link to="/lists"><Plus className="mr-2 h-4 w-4" />New list</Link>
+          <Link to="/lists"><Plus className="mr-2 h-4 w-4" />{t.comicDetail.newList}</Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -190,6 +194,7 @@ function AddToListMenu({ issueId }: { issueId: string }) {
 }
 
 function ComicDetail() {
+  const { t, locale } = useTranslation();
   const { id } = Route.useParams();
   const issueQ = useIssue(id);
   const userComicQ = useMyUserComicByIssue(id);
@@ -214,14 +219,14 @@ function ComicDetail() {
   const [similarOwned, setSimilarOwned] = useState<Comic | null>(null);
 
   if (issueQ.isLoading) {
-    return <div className="py-20 text-center text-sm text-muted-foreground">Loading…</div>;
+    return <div className="py-20 text-center text-sm text-muted-foreground">{t.comicDetail.loading}</div>;
   }
   if (!issueQ.data) {
     return (
       <div className="py-20 text-center">
-        <div className="font-display text-4xl">Not found</div>
-        <p className="mt-2 text-muted-foreground">That issue isn't in the database.</p>
-        <Link to="/inventory" className="mt-4 inline-block text-primary">Back to inventory</Link>
+        <div className="font-display text-4xl">{t.comicDetail.notFound}</div>
+        <p className="mt-2 text-muted-foreground">{t.comicDetail.notFoundDescription}</p>
+        <Link to="/inventory" className="mt-4 inline-block text-primary">{t.comicDetail.backToInventory}</Link>
       </div>
     );
   }
@@ -252,7 +257,7 @@ function ComicDetail() {
   const isWishlisted = !!isWishlistedQ.data;
 
   const favCreatorIds = new Set((favCreators.data ?? []).map((c) => c.id));
-  const writerRefs = pickCreatorRefs(issueQ.data.issue_creators, (r) => r.includes("writer"));
+  const writerRefs = pickCreatorRefs(issueQ.data.issue_creators, (r) => r.includes("writer"), t.common.unknown);
   const artistRefs = pickCreatorRefs(
     issueQ.data.issue_creators,
     (r) =>
@@ -261,16 +266,17 @@ function ComicDetail() {
       r.includes("penciller") ||
       r.includes("inker") ||
       r.includes("colorist"),
+    t.common.unknown,
   );
-  const coverArtistRefs = pickCreatorRefs(issueQ.data.issue_creators, (r) => r.includes("cover"));
+  const coverArtistRefs = pickCreatorRefs(issueQ.data.issue_creators, (r) => r.includes("cover"), t.common.unknown);
 
   const handleWishlist = () => {
     if (isWishlisted && wishlistList) {
       removeFromList.mutate(
         { listId: wishlistList.id, issueId: comic.id },
         {
-          onSuccess: () => toast.success("Removed from wishlist"),
-          onError: () => toast.error("Couldn't remove from wishlist"),
+          onSuccess: () => toast.success(t.comicDetail.removedFromWishlist),
+          onError: () => toast.error(t.comicDetail.removeFromWishlistFailed),
         },
       );
       return;
@@ -278,8 +284,8 @@ function ComicDetail() {
     addToWishlist.mutate(
       { type: "wishlist", issueId: comic.id },
       {
-        onSuccess: () => toast.success("Added to wishlist"),
-        onError: () => toast.error("Couldn't add to wishlist"),
+        onSuccess: () => toast.success(t.comicDetail.addedToWishlist),
+        onError: () => toast.error(t.comicDetail.addToWishlistFailed),
       },
     );
   };
@@ -288,8 +294,8 @@ function ComicDetail() {
     upsertUserComic.mutate(
       { issueId: comic.id, owned: !comic.owned },
       {
-        onSuccess: () => toast.success(comic.owned ? "Removed from owned" : "Marked as owned"),
-        onError: () => toast.error("Couldn't update"),
+        onSuccess: () => toast.success(comic.owned ? t.comicDetail.removedFromOwned : t.comicDetail.markedAsOwned),
+        onError: () => toast.error(t.comicDetail.updateFailed),
       },
     );
   };
@@ -330,8 +336,8 @@ function ComicDetail() {
     upsertUserComic.mutate(
       { issueId: comic.id, read: !comic.read },
       {
-        onSuccess: () => toast.success(comic.read ? "Marked as unread" : "Marked as read"),
-        onError: () => toast.error("Couldn't update"),
+        onSuccess: () => toast.success(comic.read ? t.comicDetail.markedAsUnread : t.comicDetail.markedAsRead),
+        onError: () => toast.error(t.comicDetail.updateFailed),
       },
     );
   };
@@ -341,8 +347,8 @@ function ComicDetail() {
     toggleFavSeries.mutate(
       { seriesId, isFavorite: isFavSeries },
       {
-        onSuccess: () => toast.success(isFavSeries ? `${comic.series} unfavorited` : `${comic.series} favorited`),
-        onError: () => toast.error("Couldn't update favorites"),
+        onSuccess: () => toast.success(isFavSeries ? t.comicDetail.unfavorited(comic.series) : t.comicDetail.favorited(comic.series)),
+        onError: () => toast.error(t.comicDetail.updateFavoritesFailed),
       },
     );
   };
@@ -352,8 +358,8 @@ function ComicDetail() {
     toggleFavPublisher.mutate(
       { publisherId, isFavorite: isFavPublisher },
       {
-        onSuccess: () => toast.success(isFavPublisher ? `${comic.publisher} unfavorited` : `${comic.publisher} favorited`),
-        onError: () => toast.error("Couldn't update favorites"),
+        onSuccess: () => toast.success(isFavPublisher ? t.comicDetail.unfavorited(comic.publisher) : t.comicDetail.favorited(comic.publisher)),
+        onError: () => toast.error(t.comicDetail.updateFavoritesFailed),
       },
     );
   };
@@ -362,11 +368,13 @@ function ComicDetail() {
     toggleFavCreator.mutate(
       { creatorId: creator.id, isFavorite },
       {
-        onSuccess: () => toast.success(isFavorite ? `${creator.name} unfavorited` : `${creator.name} favorited`),
-        onError: () => toast.error("Couldn't update favorites"),
+        onSuccess: () => toast.success(isFavorite ? t.comicDetail.unfavorited(creator.name) : t.comicDetail.favorited(creator.name)),
+        onError: () => toast.error(t.comicDetail.updateFavoritesFailed),
       },
     );
   };
+
+  const dateLocale = locale === "fr" ? "fr-CA" : "en-US";
 
   return (
     <div className="-mx-4 sm:-mx-6 lg:-mx-8">
@@ -378,18 +386,18 @@ function ComicDetail() {
           <div className="min-w-0 pt-4 text-white">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <PublisherBadge publisher={comic.publisher} />
-              <span className="rounded-md bg-black/40 px-2 py-0.5 font-mono text-xs">Vol. {comic.volume}</span>
+              <span className="rounded-md bg-black/40 px-2 py-0.5 font-mono text-xs">{t.comicDetail.volumeLabel} {comic.volume}</span>
               <span className="rounded-md bg-black/40 px-2 py-0.5 font-mono text-xs">#{comic.issue}</span>
               {primaryRun && <span className="rounded-md bg-black/40 px-2 py-0.5 text-xs">{primaryRun.name}</span>}
             </div>
             <div className="text-xs uppercase tracking-widest text-white/80">{comic.series}</div>
             <h1 className="font-display mt-1 text-4xl leading-tight tracking-wide sm:text-5xl">{comic.title}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-white/85">
-              <span>By <CreatorLinks creators={writerRefs} /></span>
+              <span>{t.comicDetail.by} <CreatorLinks creators={writerRefs} /></span>
               <span>·</span>
-              <span>Art <CreatorLinks creators={artistRefs} /></span>
+              <span>{t.comicDetail.art} <CreatorLinks creators={artistRefs} /></span>
               <span>·</span>
-              <span>{new Date(comic.releaseDate).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}</span>
+              <span>{new Date(comic.releaseDate).toLocaleDateString(dateLocale, { year: "numeric", month: "long", day: "numeric" })}</span>
               {comic.rating && <><span>·</span><RatingStars value={comic.rating} /></>}
             </div>
             <p className="mt-4 max-w-2xl text-sm leading-relaxed text-white/85">{comic.synopsis}</p>
@@ -402,25 +410,25 @@ function ComicDetail() {
               >
                 <Bookmark className="h-4 w-4" />
                 {addToWishlist.isPending
-                  ? "Adding…"
+                  ? t.comicDetail.adding
                   : removeFromList.isPending
-                    ? "Removing…"
+                    ? t.comicDetail.removing
                     : isWishlisted
-                      ? "In wishlist ✓"
-                      : "Wishlist"}
+                      ? t.comicDetail.inWishlist
+                      : t.comicDetail.addToWishlist}
               </Button>
               <AddToListMenu issueId={comic.id} />
               <Button variant={comic.owned ? "default" : "secondary"} onClick={handleToggleOwned} disabled={upsertUserComic.isPending}>
-                {comic.owned ? "Owned ✓" : "Mark as owned"}
+                {comic.owned ? t.comicDetail.ownedYes : t.comicDetail.markAsOwned}
               </Button>
               <Button variant={comic.read ? "default" : "secondary"} onClick={handleToggleRead} disabled={upsertUserComic.isPending}>
-                <BookOpen className="h-4 w-4" />{comic.read ? "Read ✓" : "Mark read"}
+                <BookOpen className="h-4 w-4" />{comic.read ? t.comicDetail.readYes : t.comicDetail.markRead}
               </Button>
               <Button variant={isFavSeries ? "default" : "outline"} onClick={handleToggleFavSeries} disabled={toggleFavSeries.isPending}>
-                <Heart className="h-4 w-4" />{isFavSeries ? "Series favorited" : "Favorite series"}
+                <Heart className="h-4 w-4" />{isFavSeries ? t.comicDetail.seriesFavorited : t.comicDetail.favoriteSeries}
               </Button>
               <Button variant={isFavPublisher ? "default" : "outline"} onClick={handleToggleFavPublisher} disabled={toggleFavPublisher.isPending}>
-                <Star className="h-4 w-4" />{isFavPublisher ? "Publisher favorited" : "Favorite publisher"}
+                <Star className="h-4 w-4" />{isFavPublisher ? t.comicDetail.publisherFavorited : t.comicDetail.favoritePublisher}
               </Button>
             </div>
           </div>
@@ -431,17 +439,17 @@ function ComicDetail() {
       <div className="mx-auto max-w-6xl space-y-10 px-4 py-10 sm:px-6 lg:px-8">
         <section className="grid gap-6 md:grid-cols-2">
           <div className="space-y-4 rounded-xl border border-border/60 bg-card/60 p-5">
-            <h2 className="font-display text-lg tracking-wide">Credits</h2>
+            <h2 className="font-display text-lg tracking-wide">{t.comicDetail.credits}</h2>
             <Separator />
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Series" value={comic.series} />
-              <Field label="Volume" value={comic.volume} />
-              <Field label="Issue" value={`#${comic.issue}`} />
-              <Field label="Run" value={primaryRun?.name ?? "—"} />
-              <Field label="Publisher" value={comic.publisher} />
-              <Field label="Released" value={new Date(comic.releaseDate).toLocaleDateString()} />
+              <Field label={t.comicDetail.seriesLabel} value={comic.series} />
+              <Field label={t.comicDetail.volumeFieldLabel} value={comic.volume} />
+              <Field label={t.comicDetail.issueLabel} value={`#${comic.issue}`} />
+              <Field label={t.comicDetail.runLabel} value={primaryRun?.name ?? "—"} />
+              <Field label={t.comicDetail.publisherLabel} value={comic.publisher} />
+              <Field label={t.comicDetail.releasedLabel} value={new Date(comic.releaseDate).toLocaleDateString(dateLocale)} />
               <Field
-                label="Writer(s)"
+                label={t.comicDetail.writersLabel}
                 value={
                   <CreatorLinks
                     creators={writerRefs}
@@ -453,7 +461,7 @@ function ComicDetail() {
                 }
               />
               <Field
-                label="Artist(s)"
+                label={t.comicDetail.artistsLabel}
                 value={
                   <CreatorLinks
                     creators={artistRefs}
@@ -465,7 +473,7 @@ function ComicDetail() {
                 }
               />
               <Field
-                label="Cover"
+                label={t.comicDetail.coverLabel}
                 value={
                   <CreatorLinks
                     creators={coverArtistRefs}
@@ -479,20 +487,20 @@ function ComicDetail() {
             </div>
           </div>
           <div className="space-y-4 rounded-xl border border-border/60 bg-card/60 p-5">
-            <h2 className="font-display text-lg tracking-wide">Runs</h2>
+            <h2 className="font-display text-lg tracking-wide">{t.comicDetail.runsHeading}</h2>
             <Separator />
             {runsQ.isLoading ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
+              <p className="text-sm text-muted-foreground">{t.comicDetail.loading}</p>
             ) : issueRuns.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                This issue hasn't been analyzed into a run yet.
+                {t.comicDetail.notAnalyzedYet}
                 {volumeId && (
                   <>
                     {" "}
                     <Link to="/volumes/$id" params={{ id: volumeId }} className="text-primary hover:underline">
-                      Analyze the volume
+                      {t.comicDetail.analyzeTheVolume}
                     </Link>{" "}
-                    to find it.
+                    {t.comicDetail.toFindIt}
                   </>
                 )}
               </p>
@@ -510,9 +518,9 @@ function ComicDetail() {
                       <span className="truncate font-medium">{run.name}</span>
                     </span>
                     <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                      {run.run_items.length} issues
+                      {t.common.issuesCount(run.run_items.length)}
                       <Badge variant={run.status === "verified" ? "default" : "outline"} className="text-[10px]">
-                        {run.status}
+                        {run.status === "verified" ? t.common.runStatus.verified : t.common.runStatus.draft}
                       </Badge>
                     </span>
                   </Link>
@@ -523,14 +531,14 @@ function ComicDetail() {
         </section>
 
         <section>
-          <h2 className="font-display mb-4 text-xl tracking-wide">Related</h2>
+          <h2 className="font-display mb-4 text-xl tracking-wide">{t.comicDetail.related}</h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
             {related.map((c) => <ComicCard key={c.id} comic={c} />)}
           </div>
         </section>
 
         <section>
-          <h2 className="font-display mb-4 text-xl tracking-wide">You might also like</h2>
+          <h2 className="font-display mb-4 text-xl tracking-wide">{t.comicDetail.youMightAlsoLike}</h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
             {recommended.map((c) => <ComicCard key={c.id} comic={c} />)}
           </div>
@@ -540,26 +548,20 @@ function ComicDetail() {
       <AlertDialog open={!!similarOwned} onOpenChange={(open) => { if (!open) setSimilarOwned(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Already own something similar?</AlertDialogTitle>
+            <AlertDialogTitle>{t.comicDetail.similarOwnedTitle}</AlertDialogTitle>
             <AlertDialogDescription>
-              {similarOwned && (
-                <>
-                  You already have <strong>{similarOwned.series} #{similarOwned.issue}</strong> marked as
-                  owned — this looks like the same issue, possibly a different printing or cover variant.
-                  Mark this one as owned too?
-                </>
-              )}
+              {similarOwned && t.comicDetail.similarOwnedDescription(similarOwned.series, similarOwned.issue)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setSimilarOwned(null);
                 markOwned();
               }}
             >
-              Proceed anyway
+              {t.comicDetail.proceedAnyway}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

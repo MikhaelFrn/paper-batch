@@ -15,6 +15,7 @@ import {
 import { useUserCollection } from "@/hooks/useUserComics";
 import { userComicToComic } from "@/lib/comic-adapters";
 import { isFavoriteIssue } from "@/lib/favorite-match";
+import { useTranslation } from "@/i18n";
 
 export const Route = createFileRoute("/_shell/favorites")({
   head: () => ({
@@ -29,6 +30,7 @@ export const Route = createFileRoute("/_shell/favorites")({
 });
 
 function Favorites() {
+  const { t } = useTranslation();
   const favSeries = useFavoriteSeries();
   const favPublishers = useFavoritePublishers();
   const favCreators = useFavoriteCreators();
@@ -55,14 +57,14 @@ function Favorites() {
 
   return (
     <div>
-      <PageHeader eyebrow="Your taste" title="Favorites" description="Series, publishers, creators, and the comics that match them." />
+      <PageHeader eyebrow={t.favorites.eyebrow} title={t.favorites.title} description={t.favorites.description} />
       <Tabs defaultValue="series">
         <TabsList>
-          <TabsTrigger value="series">Series</TabsTrigger>
-          <TabsTrigger value="publishers">Publishers</TabsTrigger>
-          <TabsTrigger value="creators">Creators</TabsTrigger>
-          <TabsTrigger value="runs">Runs</TabsTrigger>
-          <TabsTrigger value="comics">Comics</TabsTrigger>
+          <TabsTrigger value="series">{t.favorites.series}</TabsTrigger>
+          <TabsTrigger value="publishers">{t.favorites.publishers}</TabsTrigger>
+          <TabsTrigger value="creators">{t.favorites.creators}</TabsTrigger>
+          <TabsTrigger value="runs">{t.favorites.runs}</TabsTrigger>
+          <TabsTrigger value="comics">{t.favorites.comics}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="series" className="mt-6">
@@ -109,7 +111,7 @@ function Favorites() {
                       <CardTitle className="font-display truncate text-lg tracking-wide">{r.name}</CardTitle>
                     </span>
                     <Badge variant={r.status === "verified" ? "default" : "outline"} className="shrink-0">
-                      {r.status}
+                      {r.status === "verified" ? t.common.runStatus.verified : t.common.runStatus.draft}
                     </Badge>
                   </CardHeader>
                 </Card>
@@ -120,7 +122,7 @@ function Favorites() {
 
         <TabsContent value="comics" className="mt-6">
           <p className="mb-4 text-sm text-muted-foreground">
-            Comics from a favorite series or publisher, or with a favorite creator credited on them.
+            {t.favorites.comicsDescription}
           </p>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
             {favComics.map((c) => <ComicCard key={c.id} comic={c} />)}

@@ -8,6 +8,7 @@ import { ComicCard } from "@/components/comic-card";
 import { ImageDropZone } from "@/components/image-drop-zone";
 import { useFindCoverMatches } from "@/hooks/useCoverHash";
 import { issueToComic } from "@/lib/comic-adapters";
+import { useTranslation } from "@/i18n";
 import type { CoverMatch } from "@/services/coverHash";
 
 export const Route = createFileRoute("/_shell/scan_/cover")({
@@ -27,6 +28,7 @@ type Phase =
   | { kind: "error"; message: string };
 
 function ScanCoverPage() {
+  const { t } = useTranslation();
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const findMatches = useFindCoverMatches();
 
@@ -36,7 +38,7 @@ function ScanCoverPage() {
       onSuccess: (matches) => setPhase({ kind: "result", matches }),
       onError: (error) => {
         console.error("Cover match failed:", error);
-        setPhase({ kind: "error", message: "Couldn't read that image. Try again." });
+        setPhase({ kind: "error", message: t.scan.couldntReadImage });
       },
     });
   };
@@ -45,45 +47,41 @@ function ScanCoverPage() {
 
   return (
     <div>
-      <PageHeader eyebrow="Add by cover image" title="Scan cover image" />
+      <PageHeader eyebrow={t.scan.addByCoverImage} title={t.scan.scanCoverImage} />
 
       <div className="mx-auto mb-6 max-w-md rounded-lg border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
-        This compares image hashes — it isn't reverse image search, don't expect miracles. Works best
-        with official cover art, screenshots, or a dead-straight, well-lit, glare-free photo. It also
-        only matches comics already in your Vault (search, barcode, or an analyzed volume) — nothing
-        gets pulled in from ComicVine's wider catalog here.
+        {t.scan.coverDisclaimer}
       </div>
 
       {phase.kind === "idle" && (
         <div className="mx-auto max-w-md">
-          <ImageDropZone onFile={handleFile} label="of the cover here, or click to browse" />
+          <ImageDropZone onFile={handleFile} label={t.scan.dropCoverLabel} />
         </div>
       )}
 
       {phase.kind === "matching" && (
-        <div className="py-20 text-center text-sm text-muted-foreground">Comparing against your catalog…</div>
+        <div className="py-20 text-center text-sm text-muted-foreground">{t.scan.comparingCatalog}</div>
       )}
 
       {phase.kind === "error" && (
         <div className="mx-auto max-w-md py-16 text-center">
           <div className="text-sm text-destructive">{phase.message}</div>
           <div className="mt-4 flex justify-center gap-2">
-            <Button onClick={reset}><RotateCcw className="h-4 w-4" />Try again</Button>
-            <Button variant="outline" asChild><Link to="/search"><Search className="h-4 w-4" />Search manually</Link></Button>
+            <Button onClick={reset}><RotateCcw className="h-4 w-4" />{t.scan.tryAgain}</Button>
+            <Button variant="outline" asChild><Link to="/search"><Search className="h-4 w-4" />{t.scan.searchManually}</Link></Button>
           </div>
         </div>
       )}
 
       {phase.kind === "result" && phase.matches.length === 0 && (
         <div className="mx-auto max-w-md py-16 text-center">
-          <div className="font-medium">No close-enough matches.</div>
+          <div className="font-medium">{t.scan.noCloseMatches}</div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Either it's not in your catalog yet, or the photo's too different from the stored cover for
-            a hash comparison to catch it.
+            {t.scan.noCloseMatchesDescription}
           </p>
           <div className="mt-4 flex justify-center gap-2">
-            <Button onClick={reset}><RotateCcw className="h-4 w-4" />Try again</Button>
-            <Button variant="outline" asChild><Link to="/search"><Search className="h-4 w-4" />Search manually</Link></Button>
+            <Button onClick={reset}><RotateCcw className="h-4 w-4" />{t.scan.tryAgain}</Button>
+            <Button variant="outline" asChild><Link to="/search"><Search className="h-4 w-4" />{t.scan.searchManually}</Link></Button>
           </div>
         </div>
       )}
@@ -92,9 +90,9 @@ function ScanCoverPage() {
         <div>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">
-              Closest matches, ranked — none of these guaranteed right, check before trusting one.
+              {t.scan.closestMatches}
             </p>
-            <Button variant="outline" size="sm" onClick={reset}><RotateCcw className="h-4 w-4" />Try again</Button>
+            <Button variant="outline" size="sm" onClick={reset}><RotateCcw className="h-4 w-4" />{t.scan.tryAgain}</Button>
           </div>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
             {phase.matches.map((match) => (

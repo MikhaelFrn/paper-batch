@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
+import { LocaleProvider } from "@/i18n";
 
 function NotFoundComponent() {
   return (
@@ -120,14 +121,20 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
-      {/* Root-level, not _shell-level: login/signup/forgot-password/etc.
-          are outside _shell and need somewhere to actually render a
-          toast too — previously nothing did, so e.g. "Invalid email or
-          password" on a failed login silently had no surface to show up
-          on at all. */}
-      <Toaster />
+      {/* Root-level, not _shell-level: language needs to work on
+          login/signup/forgot-password too, not just the authenticated
+          app — see the "accessible even from login/signup" requirement
+          this was built for. */}
+      <LocaleProvider>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+        {/* Root-level, not _shell-level: login/signup/forgot-password/etc.
+            are outside _shell and need somewhere to actually render a
+            toast too — previously nothing did, so e.g. "Invalid email or
+            password" on a failed login silently had no surface to show up
+            on at all. */}
+        <Toaster />
+      </LocaleProvider>
     </QueryClientProvider>
   );
 }

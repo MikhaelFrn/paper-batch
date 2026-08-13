@@ -11,7 +11,8 @@ import { useSearch } from "@/hooks/useSearch";
 import { useComicVineSearch, useLoadMoreComicVineIssues } from "@/hooks/useComicVine";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { issueToComic, cvIssueToComic } from "@/lib/comic-adapters";
-import { getKnownSafeErrorMessage } from "@/lib/rate-limit-messages";
+import { getKnownSafeErrorKind } from "@/lib/rate-limit-messages";
+import { useTranslation } from "@/i18n";
 import type { CvSearchIssue } from "@/integrations/comicvine/types";
 
 export const Route = createFileRoute("/_shell/search")({
@@ -30,6 +31,7 @@ export const Route = createFileRoute("/_shell/search")({
 });
 
 function SearchPage() {
+  const { t } = useTranslation();
   const { q: initialQ } = Route.useSearch();
   const [q, setQ] = useState(initialQ ?? "");
   // Re-seed when arriving with a new ?q= (e.g. a second topbar search while
@@ -112,13 +114,13 @@ function SearchPage() {
           setOffset(result.nextOffset);
           if (result.issues.length === 0) {
             setExhausted(true);
-            toast.info("No more issues to load for this search.");
+            toast.info(t.search.noMoreIssues);
           } else {
-            toast.success(`Added ${result.issues.length} more issue${result.issues.length === 1 ? "" : "s"}.`);
+            toast.success(t.search.moreIssuesAdded(result.issues.length));
           }
         },
         onError: () => {
-          toast.error("Couldn't load more issues from ComicVine.");
+          toast.error(t.search.loadMoreFailed);
         },
       },
     );
@@ -134,16 +136,23 @@ function SearchPage() {
 
   return (
     <div>
-      <PageHeader eyebrow="Global search" title="Search" description="Comics, series, runs, creators, characters, and teams." />
+      <PageHeader eyebrow={t.search.eyebrow} title={t.search.title} description={t.search.description} />
       <div className="relative mb-8 max-w-2xl">
         <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Try 'batman', 'saga', 'Jim Lee'…" className="h-12 pl-10 text-base" />
+        <Input
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder={t.search.placeholder}
+          aria-label={t.search.ariaLabel}
+          className="h-12 pl-10 text-base"
+        />
       </div>
 
       {q.trim() === "" ? (
-        <p className="text-sm text-muted-foreground">Start typing to search across the entire database.</p>
+        <p className="text-sm text-muted-foreground">{t.search.startTyping}</p>
       ) : search.isLoading ? (
-        <p className="text-sm text-muted-foreground">Searching…</p>
+        <p className="text-sm text-muted-foreground">{t.search.searching}</p>
       ) : !data ? null : (
         <>
           {cvSearch.isError && (
@@ -151,26 +160,28 @@ function SearchPage() {
             // ComicVine-sourced portion (not-yet-catalogued comics/volumes)
             // is missing, so this is a small notice, not a blocking error.
             <p className="mb-6 text-sm text-muted-foreground">
-              {getKnownSafeErrorMessage(cvSearch.error) ??
-                "Couldn't reach ComicVine for uncatalogued results — showing what's in your library only."}
+              {(() => {
+                const kind = getKnownSafeErrorKind(cvSearch.error);
+                return kind ? t.errors[kind] : t.search.cvUnreachable;
+              })()}
             </p>
           )}
-          <Group title="Comics" count={issueComics.length}>
+          <Group title={t.search.comics} count={issueComics.length}>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
               {issueComics.map((c) => <ComicCard key={c.id} comic={c} />)}
             </div>
             {canLoadMore && (
               <div className="mt-4 flex justify-center">
                 <Button variant="outline" onClick={handleLoadMore} disabled={loadMore.isPending}>
-                  {loadMore.isPending ? "Loading…" : "Load more"}
+                  {loadMore.isPending ? t.search.loadingMore : t.search.loadMore}
                 </Button>
               </div>
             )}
           </Group>
-          <Group title="Series" count={data.series.length}>
+          <Group title={t.search.series} count={data.series.length}>
             <div className="flex flex-wrap gap-2">{data.series.map((s) => <Card key={s.id} className="border-border/60"><CardContent className="p-3 text-sm">{s.name}</CardContent></Card>)}</div>
           </Group>
-          <Group title="Runs" count={data.runs.length}>
+          <Group title={t.search.runs} count={data.runs.length}>
             <div className="flex flex-wrap gap-2">
               {data.runs.map((r) => (
                 <Link
@@ -184,7 +195,7 @@ function SearchPage() {
               ))}
             </div>
           </Group>
-          <Group title="Volumes" count={data.volumes.length + cvVolumesOnly.length}>
+          <Group title={t.search.volumes} count={data.volumes.length + cvVolumesOnly.length}>
             <div className="flex flex-wrap gap-2">
               {data.volumes.map((v) => (
                 <Link key={v.id} to="/volumes/$id" params={{ id: v.id }} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm hover:border-primary/40">
@@ -198,10 +209,10 @@ function SearchPage() {
               ))}
             </div>
           </Group>
-          <Group title="Creators" count={data.creators.length}>
+          <Group title={t.search.creators} count={data.creators.length}>
             <div className="flex flex-wrap gap-2">{data.creators.map((c) => <span key={c.id} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm">{[c.first_name, c.last_name].filter(Boolean).join(" ")}</span>)}</div>
           </Group>
-          <Group title="Publishers" count={data.publishers.length}>
+          <Group title={t.search.publishers} count={data.publishers.length}>
             <div className="flex flex-wrap gap-2">{data.publishers.map((p) => <PublisherBadge key={p.id} publisher={p.name} />)}</div>
           </Group>
         </>

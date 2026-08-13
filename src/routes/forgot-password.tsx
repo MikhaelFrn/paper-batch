@@ -3,8 +3,8 @@ import { AuthShell } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTranslation } from "@/i18n";
 import { toast } from "sonner";
-import { Toaster } from "@/components/ui/sonner";
 import { useState } from "react";
 import { requestPasswordReset } from "@/services/auth";
 
@@ -21,55 +21,52 @@ export const Route = createFileRoute("/forgot-password")({
 });
 
 function Forgot() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!email.trim()) {
-      toast.error("Please enter your email address.");
+      toast.error(t.auth.forgotPassword.missingEmail);
       return;
     }
 
     try {
       await requestPasswordReset(email.trim());
-      toast.success("Check your inbox for a reset link.");
+      toast.success(t.auth.forgotPassword.success);
     } catch {
-      toast.error("Unable to send password reset email.");
+      toast.error(t.auth.forgotPassword.error);
     }
   };
 
   return (
-    <>
-      <AuthShell
-        title="Reset password"
-        subtitle="We'll email you a reset link."
-        footer={
-          <Link to="/login" className="text-primary hover:underline">
-            Back to sign in
-          </Link>
-        }
-      >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="peter@dailybugle.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
+    <AuthShell
+      title={t.auth.forgotPassword.title}
+      subtitle={t.auth.forgotPassword.subtitle}
+      footer={
+        <Link to="/login" className="text-primary hover:underline">
+          {t.auth.forgotPassword.backToSignIn}
+        </Link>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <Label htmlFor="email">{t.auth.forgotPassword.emailLabel}</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder={t.auth.forgotPassword.emailPlaceholder}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
 
-          <Button type="submit" className="w-full">
-            Send reset link
-          </Button>
-        </form>
-      </AuthShell>
-
-      <Toaster />
-    </>
+        <Button type="submit" className="w-full">
+          {t.auth.forgotPassword.submit}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

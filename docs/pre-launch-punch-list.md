@@ -371,3 +371,296 @@ reading code.
   - Stress test: 100 lists, 2000 comics in the collection — does
     everything (Inventory, especially, given the unpaginated
     `listMyCollection()` above) stay responsive?
+
+## Found from your own browser testing
+
+- **Keyboard focus was invisible on comic cards.** `outline-none` with
+  nothing replacing it, and the only visual state was `group-hover:*` —
+  mouse-only. Fixed: a real `focus-visible` ring (keyboard-only, doesn't
+  show on mouse clicks) plus mirroring the hover lift/highlight for
+  `group-focus-visible:*` (`src/components/comic-card.tsx`).
+- **"spider"/"spid"/"spider-" barely returning Spider-Man results** turned
+  out to be mostly ComicVine's own search engine, not our code — verified
+  live against their real API: `"spid"` returns **zero** results from CV
+  itself (their index doesn't do prefix/substring matching — `"batm"` and
+  `"batma"` also return nothing, while `"bat"` works), and bare `"spider"`
+  ranks an unrelated pulp-hero series called *The Spider* above Spider-Man
+  in CV's own relevance engine. Not fixable on our end.
+- **The bugged Batman result (Spanish, 2026, issue #199805) was real and
+  fixed.** Two compounding bugs: (1) the foreign-market publisher denylist
+  (built earlier for exactly this problem) only filtered *volume* search
+  results — issue search has no `publisher` field on CV's response at
+  all, so that path had zero filtering; fixed by reusing the cached
+  volume→publisher lookup for issues too. (2) The denylist itself was
+  incomplete — live-searching "Batman"/"Spider-Man" turned up 9 more
+  foreign reprint publishers not yet caught (Ediciones Zinco, Norma
+  Editorial, Epucol, Editions Interpresse S.A., TM-Semic, Panini France,
+  Hjemmet, Bladkompaniet A.S., JuniorPress BV, Éditions de l'Occident) —
+  added. Both in `src/integrations/comicvine/client.ts`.
+
+## Security audit, round 2
+
+A second, independent security review (from another source) came back —
+went through everything actually actionable in it. Its central point was
+fair: the first pass verified RLS by *reasoning about policy SQL*, not by
+actually hitting every table the way an attacker would. This round fixed
+that gap directly.
+
+- **Found and fixed: `is_list_member` RPC callable with zero
+  authentication.** It's a `SECURITY DEFINER` helper meant only for
+  internal use inside `lists`/`list_items`/`list_members`'s own RLS
+  policies, but Postgres grants `EXECUTE` to `PUBLIC` by default on
+  function creation, and PostgREST exposes every public-schema function
+  as an RPC endpoint unless revoked. Confirmed live: `POST
+  /rest/v1/rpc/is_list_member` was callable with **no auth at all** and
+  arbitrary `{p_list_id, p_user_id}` — leaking "is user X a member of
+  list Y" for any UUID pair. Low severity (boolean-only, no row content,
+  both params are non-guessable UUIDs) but a real, needless hole.
+  **Migration not yet run:**
+  `supabase/migrations/20260813000000_restrict_is_list_member_rpc.sql`.
+  Can't just revoke `EXECUTE` entirely — Postgres requires the querying
+  role to hold `EXECUTE` on a function even when it's only invoked
+  *indirectly* through a policy expression, so revoking from
+  `authenticated` would break viewing a list you're a member of (not
+  owner), app-wide. The migration revokes the default `PUBLIC` grant
+  (what `anon` was riding on) and re-grants explicitly to `authenticated`
+  only.
+- **Comprehensive per-table live audit** (the actual "curl every table"
+  exercise) — every table in `public` tested unauthenticated and as a
+  real logged-in session, comparing what came back against what the
+  table actually contains (via service-role) to catch any cross-user
+  leakage, not just presence/absence:
+  - Catalog tables (`issues`, `volumes`, `series`, `publishers`,
+    `creators`, `covers`, `issue_creators`, `runs`, `run_items`,
+    `run_creators`, `run_relationships`, `profiles`): readable
+    unauthenticated, as intended.
+  - `barcode_lookups`/`app_counters`: correctly blocked unauthenticated;
+    `barcode_lookups` correctly opens up once authenticated (shared
+    cache, no per-user data).
+  - Every user-owned table (`user_comics`, `favorite_creators`,
+    `favorite_publishers`, `favorite_runs`, `favorite_series`, `lists`,
+    `list_items`, `list_members`): zero rows unauthenticated (except
+    `lists`/`list_items`, see next point), and as the real authenticated
+    user, zero rows returned belonged to anyone else — this is what
+    actually proves isolation, not just "some rows came back."
+  - `lists`/`list_items` *did* return rows unauthenticated at first
+    glance — turned out to be exactly the public-list feature working as
+    designed; double-checked every row returned really was
+    `visibility: 'public'`, not a mix. No leak.
+  - No `CREATE VIEW` exists anywhere in the schema (the other RLS-bypass
+    vector raised — views running as their creator can silently ignore
+    RLS on the underlying tables). Only 4 `SECURITY DEFINER` functions
+    exist; 3 are fine as-is (`handle_new_user` is trigger-only,
+    `rls_auto_enable` is an event trigger, `increment_app_counter` takes
+    an arbitrary key but the worst case is junk rows in a counter table,
+    not data exposure); `is_list_member` is the one above.
+- **XSS: confirmed clean, not just "no `dangerouslySetInnerHTML`."**
+  Session lives in a cookie this app's own custom adapter reads via
+  `document.cookie` (not `httpOnly` — it has to be readable for the
+  browser client to attach the auth header), so XSS would still be full
+  account takeover if it existed anywhere. It doesn't: the only
+  `dangerouslySetInnerHTML` in the whole codebase is in an **unused**
+  shadcn `chart.tsx` boilerplate file, fed a developer-authored color
+  config, never user or API data. And the app doesn't even fetch
+  ComicVine's `description` field (the one CV returns as raw HTML) — not
+  in any `field_list`, not in any type. Zero exposure either way.
+- **Every ComicVine-touching server function requires auth** — checked
+  all 14 `createServerFn` endpoints in the app (`comicvine.ts`,
+  `coverHash.ts`, `barcode.ts`, `runs.ts`, `account.ts`); every one that
+  should require login does (`fetchServerUser` is the only exception,
+  correctly so — it's the "am I logged in" check itself). This app uses
+  TanStack Start server functions, not Supabase Edge Functions, so the
+  "was `--no-verify-jwt` left on" question doesn't apply, but the
+  underlying concern (an unauthenticated path that burns ComicVine quota)
+  was worth checking directly rather than assuming — confirmed there
+  isn't one. `deleteMyAccount` also specifically confirmed to read the
+  target user id from the caller's *own* session, never from client
+  input.
+- **PostgREST filter injection (`.or()`), tested with real payloads** —
+  not just re-read the escaping code. Threw `a,id.gt.0` and
+  `a),name.neq.` at the real search endpoint; both came back as literal
+  search text, zero rows, no injected filter. `esc()`'s comma/paren
+  stripping holds.
+- **Git history: clean.** The only env-related commits ever made touched
+  `.env.example`, and its actual content has only ever been placeholder
+  text (`spbkey`, `comicvinekey`, etc.), confirmed by reading it, not
+  guessed from the filename.
+- **GitHub repo: confirmed private** via an unauthenticated call to
+  GitHub's public API (404, not 403 — GitHub deliberately returns 404
+  for private repos to avoid confirming they exist to non-owners). Can't
+  confirm it was *never* public in the past — that needs GitHub's own
+  audit log, not visible from here.
+- **`npm audit`: 4 high/moderate findings, all in build tooling**
+  (`brace-expansion` via typescript-eslint, `js-yaml`, `nanoid`,
+  `postcss` — dev-time only, never shipped or reachable by an end user).
+  Ran `npm audit fix`; all 4 resolved with no breaking changes,
+  `tsc`/`npm test`/`npm run build` all still clean afterward.
+- **Client bundle re-checked for secrets after all of today's changes** —
+  still zero occurrences of the service-role key, the ComicVine key,
+  their identifiers, or `process.env`.
+
+### Still needs you (dashboard-only, not visible from code)
+
+- Run the new `is_list_member` migration, same as the others.
+- Supabase Auth settings: redirect URL allowlist restricted to your real
+  domain (the Google OAuth callback URL note above already covers this
+  for production), email confirmation on, leaked-password protection
+  (HaveIBeenPwned check) on, and confirm signup is restricted to however
+  broad you actually want it right now.
+- Ops, not urgent pre-launch but worth knowing about: a separate staging
+  Supabase project before you run migrations against real data going
+  forward, point-in-time recovery, and some form of error monitoring
+  (Sentry or similar) so you hear about a prod break from a dashboard
+  instead of a user.
+
+## Accessibility pass
+
+Went through every custom interactive element in the app (icon-only
+buttons, form labels, non-semantic click handlers, focus visibility,
+images) rather than just the one component you'd already found. Radix
+primitives (Dialog/AlertDialog/Select/Dropdown/etc.) already handle focus
+trapping and keyboard activation correctly by construction — verified no
+custom modal/overlay exists outside them, so that class of bug isn't
+possible here. What needed fixing was all hand-written:
+
+- **Icon-only buttons/links with no accessible name**: the three "X"
+  remove buttons (collaborator, list item, run link) had only a mouse-hover
+  `title`, nothing a screen reader or keyboard-focus indicator picks up —
+  added matching `aria-label` to all three. Same for the topbar's avatar
+  menu trigger, the profile page's camera/avatar-upload button, and the
+  Inventory grid/list view-toggle buttons (added `aria-pressed` too, since
+  they're a two-state toggle).
+- **A remove button that was literally unreachable by keyboard at all** —
+  found while fixing the label issue above. The per-item remove button on
+  a list's comic grid was `hidden` with only `group-hover:flex` to reveal
+  it; since a `display:none` element can't receive focus, there was no way
+  to reach it without a mouse, full stop. Added `group-focus-within:flex`
+  alongside the hover variant, so tabbing to the comic card (which already
+  has a focus ring from the earlier fix) reveals the button for the next
+  Tab press.
+- **Sidebar nav links losing their accessible name when collapsed to
+  icon-only mode** — the visible text label gets `display:none`'d in that
+  state, and a Radix tooltip's content isn't a reliable substitute for a
+  real accessible name. Added an unconditional `aria-label` so it holds
+  regardless of sidebar state.
+- **Labels not programmatically associated with their inputs** — the
+  biggest one. `<Label>Email</Label><Input .../>` with no `htmlFor`/`id`
+  pairing appeared across login, signup, profile, list creation/editing,
+  the collaborator picker, and the run-linking search — meaning a screen
+  reader announces nothing when focusing the field, and clicking the label
+  text doesn't focus the input for anyone, sighted or not. Fixed every
+  instance found (paired `id`/`htmlFor`, including on a `Select` trigger
+  and a `Switch`, which both support it the same way as a plain input).
+  Two placeholder-only search inputs (topbar, main search page, barcode
+  scan, Inventory's quick filter, the volume-analysis range inputs) got
+  `aria-label` instead, since a placeholder alone isn't a reliable label
+  (it disappears once you start typing).
+- **Another invisible-focus-ring case**, same root cause as the comic-card
+  fix from your own testing: the drag-and-drop image zone (barcode/cover
+  scan) is keyboard-operable (`role="button"`, `tabIndex`, and it already
+  correctly wires Enter/Space — someone did that part right) but had
+  `outline-none` with nothing replacing it. Added the same focus-visible
+  ring treatment.
+- **Added a skip-to-content link** — previously every page load put a
+  keyboard user at the top of the sidebar, meaning the full nav had to be
+  tabbed through before reaching any actual page content. Standard
+  visually-hidden-until-focused link, first focusable element on every
+  authenticated page.
+- **Found, not fixed — a real gap, but a bigger one**: the avatar crop
+  dialog's pan (drag-to-reposition-the-image) has no keyboard equivalent
+  at all. Fixing that properly (arrow-key nudging, with sensible step
+  size and clamping to the same bounds the drag handler already enforces)
+  is a real feature addition, not a label fix — flagging it rather than
+  rushing it in.
+- Confirmed clean by construction, not just spot-checked: swept every
+  `outline-none` usage in the codebase — all the shadcn primitive
+  components already pair it correctly with `focus-visible:ring` (that's
+  the standard shadcn pattern), so the only real gaps were the two
+  hand-written components above. Also checked every `<img>`/`AvatarImage`
+  for alt text (all correct, including a deliberate empty `alt=""` on the
+  crop dialog's preview image) and grepped for non-semantic
+  `<div>`/`<span onClick>` interactive elements (none found beyond the
+  drop-zone, which was already correctly built as `role="button"`).
+
+`tsc`, `eslint`, `npm test`, and `npm run build` all clean throughout.
+
+## i18n (French) — foundation + auth flow
+
+Started the actual i18n work. Built the system and fully wired it through
+the entire logged-out auth flow (login, signup, forgot-password,
+reset-password, goodbye, the OAuth callback page) — the rest of the
+authenticated app (`_shell`'s ~15 pages) still has hardcoded English and
+is a separate, later pass; translating the whole app in one sitting
+wasn't attempted, on purpose.
+
+- **`src/i18n/`** — its own dedicated folder, as asked: `locales/en.ts` +
+  `locales/fr.ts` (Quebec French), a `LocaleContext.tsx` provider, and a
+  barrel `index.ts`. `t` is exposed as the whole current-language
+  dictionary object (`t.auth.login.title`), not a `t("auth.login.title")`
+  string-key function — a typo or missing translation is a TypeScript
+  compile error this way, not a silent runtime fallback.
+  `fr.ts`'s type is pinned to `typeof en` so the two dictionaries can
+  never drift out of shape; confirmed live by temporarily breaking it
+  during development — TypeScript caught it immediately.
+- **Persistence**: a cookie, not localStorage — matches the pattern
+  `ui/sidebar.tsx` already uses in this app for its own collapsed-state
+  preference, rather than introducing a second mechanism for the same
+  kind of problem. Not read back during SSR (same tradeoff the sidebar
+  cookie already accepts), so the very first server-rendered frame is
+  always English, corrected to the stored/detected language in a layout
+  effect before the browser paints — verified live that this produces no
+  visible flash in practice, not just assumed. First-ever visit (no
+  cookie yet) falls back to `navigator.language`.
+  Also updates `<html lang>` on every change — that attribute isn't just
+  metadata, screen readers use it to pick pronunciation rules, so it
+  needs to track the actual displayed language.
+- **`LanguageSwitcher`** (`src/components/language-switcher.tsx`) — a
+  plain two-button EN/FR toggle rather than a dropdown (only two options,
+  so a dropdown would just add an extra click for no benefit). Placed in
+  `AuthShell` (top-right corner, so it's on every logged-out page as
+  asked) and in the authenticated sidebar's footer, so switching isn't
+  only possible before logging in.
+- **Terms/Privacy acceptance on signup** — a required "I accept the
+  [Terms of Use & Privacy Policy]" checkbox, where the bracketed part
+  opens a dialog (`src/components/terms-dialog.tsx`). Both the
+  email/password submit button *and* the "Continue with Google" button
+  are disabled until it's checked — found and closed a real gap in the
+  process: the Google path didn't originally check acceptance at all,
+  meaning it was possible to create an account via Google without ever
+  seeing the checkbox.
+  **The dialog's content is a placeholder, not the real policy** — you
+  decided that explicitly (choosing between "ship a placeholder now" and
+  "ship the actual draft now"): the real text is still a private,
+  gitignored draft pending your sister's legal review
+  (`docs/legal-draft-privacy-and-terms.md`), and putting it in
+  `src/i18n/locales/*.ts` would make it real shipped, public,
+  bundled-and-built app content — a fundamentally different thing than a
+  private planning doc, regardless of the .md file's own gitignore
+  status. Swapping the placeholder for the real text later needs zero UI
+  changes, just filling in `terms.placeholderBody` (both languages) once
+  it's ready.
+- **Contact footer on the auth pages** — added to `AuthShell` (so it's on
+  login/signup/forgot-password/reset-password/goodbye, as asked), same
+  `mailto:comicvault.support@gmail.com` link and icon as the sidebar's.
+- Verified live, not just by reading the code: started the dev server,
+  fetched the real server-rendered HTML for `/login` and `/signup`, and
+  confirmed the translated strings, the EN/FR buttons, the contact link,
+  and the terms checkbox are actually present in the DOM output, not
+  just compiling.
+
+### Left for later, on purpose
+
+- The rest of the app (`_shell`'s pages — dashboard, inventory, search,
+  volumes, runs, lists, favorites, profile, settings, scan flows, etc.)
+  still has hardcoded English throughout. Same `t.foo.bar` pattern
+  extends cleanly to all of it; it's a large, mechanical pass, not a
+  design problem, but genuinely large enough to warrant its own session
+  rather than rushing it in alongside the auth-flow work.
+- Real Terms/Privacy content, once your sister has reviewed the draft.
+- Whether IP-level (not just account-level) enforcement is ever worth
+  building — see the answer already given about `ban_duration` via
+  Supabase's Admin API vs. real IP banning needing Vercel's layer
+  instead, not Supabase's.
+
+`tsc`, `eslint`, `npm test`, and `npm run build` all clean; auth pages
+verified live against real server-rendered output.

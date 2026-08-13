@@ -42,6 +42,7 @@ import { useSearchProfiles } from "@/hooks/useProfiles";
 import { useCurrentUser } from "@/hooks/useAuth";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { issueToComic } from "@/lib/comic-adapters";
+import { useTranslation } from "@/i18n";
 import type { ListMemberRole } from "@/lib/types";
 
 export const Route = createFileRoute("/_shell/lists_/$id")({
@@ -64,6 +65,7 @@ function CollaboratorsDialog({
   listId: string;
   currentUserId: string | undefined;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, 300);
@@ -82,10 +84,10 @@ function CollaboratorsDialog({
       { listId, userId, role },
       {
         onSuccess: () => {
-          toast.success("Collaborator added.");
+          toast.success(t.lists.collaboratorAdded);
           setQuery("");
         },
-        onError: () => toast.error("Couldn't add that collaborator."),
+        onError: () => toast.error(t.lists.addCollaboratorFailed),
       },
     );
   };
@@ -93,33 +95,38 @@ function CollaboratorsDialog({
   const handleRemove = (userId: string) => {
     removeMember.mutate(
       { listId, userId },
-      { onError: () => toast.error("Couldn't remove that collaborator.") },
+      { onError: () => toast.error(t.lists.removeCollaboratorFailed) },
     );
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm"><Users className="h-4 w-4" />Collaborators</Button>
+        <Button variant="outline" size="sm"><Users className="h-4 w-4" />{t.lists.collaborators}</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Collaborators</DialogTitle>
-          <DialogDescription>Editors can add comics to this list. They can't remove anything — only you can.</DialogDescription>
+          <DialogTitle>{t.lists.collaborators}</DialogTitle>
+          <DialogDescription>{t.lists.collaboratorsDialogDescription}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div>
-            <Label>Add by username</Label>
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search username…" />
+            <Label htmlFor="collaborator-search">{t.lists.addByUsername}</Label>
+            <Input
+              id="collaborator-search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t.lists.searchUsernamePlaceholder}
+            />
             {candidates.length > 0 && (
               <div className="mt-2 space-y-2">
                 {candidates.map((p) => (
                   <div key={p.id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
                     <span className="truncate">{p.display_name ?? p.username}</span>
                     <div className="flex shrink-0 gap-1">
-                      <Button size="sm" variant="outline" disabled={addMember.isPending} onClick={() => handleAdd(p.id, "viewer")}>Viewer</Button>
-                      <Button size="sm" disabled={addMember.isPending} onClick={() => handleAdd(p.id, "editor")}>Editor</Button>
+                      <Button size="sm" variant="outline" disabled={addMember.isPending} onClick={() => handleAdd(p.id, "viewer")}>{t.lists.roleViewer}</Button>
+                      <Button size="sm" disabled={addMember.isPending} onClick={() => handleAdd(p.id, "editor")}>{t.lists.roleEditor}</Button>
                     </div>
                   </div>
                 ))}
@@ -128,20 +135,23 @@ function CollaboratorsDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Current members</Label>
+            <Label>{t.lists.currentMembers}</Label>
             {(members.data ?? []).map((m) => (
               <div key={m.user_id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
                 <span className="truncate">
-                  {m.profile?.display_name ?? m.profile?.username ?? "Unknown user"}
-                  {m.user_id === currentUserId ? " (you)" : ""}
+                  {m.profile?.display_name ?? m.profile?.username ?? t.lists.unknownUser}
+                  {m.user_id === currentUserId ? ` ${t.lists.you}` : ""}
                 </span>
                 <div className="flex shrink-0 items-center gap-2">
-                  <span className="text-xs uppercase tracking-wide text-muted-foreground">{m.role}</span>
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                    {m.role === "editor" ? t.lists.roleEditor : m.role === "viewer" ? t.lists.roleViewer : m.role}
+                  </span>
                   {m.role !== "owner" && (
                     <button
                       type="button"
                       onClick={() => handleRemove(m.user_id)}
-                      title="Remove collaborator"
+                      title={t.lists.removeCollaborator(m.profile?.display_name ?? m.profile?.username ?? t.lists.unknownUser)}
+                      aria-label={t.lists.removeCollaborator(m.profile?.display_name ?? m.profile?.username ?? t.lists.unknownUser)}
                       className="text-muted-foreground hover:text-destructive"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -158,6 +168,7 @@ function CollaboratorsDialog({
 }
 
 function ListDetail() {
+  const { t } = useTranslation();
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const list = useList(id);
@@ -174,14 +185,14 @@ function ListDetail() {
   const [isPublic, setIsPublic] = useState(false);
 
   if (list.isLoading) {
-    return <div className="py-20 text-center text-sm text-muted-foreground">Loading…</div>;
+    return <div className="py-20 text-center text-sm text-muted-foreground">{t.common.loading}</div>;
   }
   if (!list.data) {
     return (
       <div className="py-20 text-center">
-        <div className="font-display text-4xl">Not found</div>
-        <p className="mt-2 text-muted-foreground">That list doesn't exist, or isn't yours.</p>
-        <Link to="/lists" className="mt-4 inline-block text-primary">Back to lists</Link>
+        <div className="font-display text-4xl">{t.common.notFound}</div>
+        <p className="mt-2 text-muted-foreground">{t.lists.listNotFound}</p>
+        <Link to="/lists" className="mt-4 inline-block text-primary">{t.lists.backToLists}</Link>
       </div>
     );
   }
@@ -203,17 +214,17 @@ function ListDetail() {
 
   const handleSaveEdit = () => {
     if (!name.trim()) {
-      toast.error("Name can't be empty.");
+      toast.error(t.lists.nameEmpty);
       return;
     }
     updateList.mutate(
       { id: data.id, patch: { name: name.trim(), description: description.trim() || null, visibility: isPublic ? "public" : "private" } },
       {
         onSuccess: () => {
-          toast.success("List updated.");
+          toast.success(t.lists.listUpdated);
           setEditOpen(false);
         },
-        onError: () => toast.error("Couldn't update that list."),
+        onError: () => toast.error(t.lists.updateFailed),
       },
     );
   };
@@ -221,17 +232,17 @@ function ListDetail() {
   const handleDelete = () => {
     deleteList.mutate(data.id, {
       onSuccess: () => {
-        toast.success("List deleted.");
+        toast.success(t.lists.listDeleted);
         navigate({ to: "/lists" });
       },
-      onError: () => toast.error("Couldn't delete that list."),
+      onError: () => toast.error(t.lists.deleteFailed),
     });
   };
 
   const handleRemove = (issueId: string) => {
     removeIssue.mutate(
       { listId: data.id, issueId },
-      { onError: () => toast.error("Couldn't remove that issue.") },
+      { onError: () => toast.error(t.lists.removeIssueFailed) },
     );
   };
 
@@ -241,10 +252,10 @@ function ListDetail() {
       { listId: data.id, userId: currentUser.data.id },
       {
         onSuccess: () => {
-          toast.success("Left the list.");
+          toast.success(t.lists.leftList);
           navigate({ to: "/lists" });
         },
-        onError: () => toast.error("Couldn't leave that list."),
+        onError: () => toast.error(t.lists.leaveFailed),
       },
     );
   };
@@ -252,29 +263,29 @@ function ListDetail() {
   return (
     <div>
       <PageHeader
-        eyebrow={data.type === "custom" ? "Custom list" : data.type === "wishlist" ? "Wishlist" : "Reading list"}
+        eyebrow={data.type === "custom" ? t.lists.customList : data.type === "wishlist" ? t.lists.wishlistType : t.lists.readingList}
         title={data.name}
-        description={data.description || `${items.length} issue${items.length === 1 ? "" : "s"}`}
+        description={data.description || t.lists.itemsCount(items.length)}
         actions={
           <div className="flex gap-2">
             {isOwner && <CollaboratorsDialog listId={data.id} currentUserId={currentUser.data?.id} />}
             {isOwner && (
               <>
-                <Button variant="outline" size="sm" onClick={openEdit}><Pencil className="h-4 w-4" />Edit</Button>
+                <Button variant="outline" size="sm" onClick={openEdit}><Pencil className="h-4 w-4" />{t.lists.edit}</Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="sm"><Trash2 className="h-4 w-4" />Delete</Button>
+                    <Button variant="outline" size="sm"><Trash2 className="h-4 w-4" />{t.lists.delete}</Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Delete "{data.name}"?</AlertDialogTitle>
+                      <AlertDialogTitle>{t.lists.deleteListTitle(data.name)}</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This removes the list and its items. This can't be undone.
+                        {t.lists.deleteListDescription}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+                      <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDelete}>{t.lists.delete}</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
@@ -282,7 +293,7 @@ function ListDetail() {
             )}
             {!isOwner && isMember && (
               <Button variant="outline" size="sm" onClick={handleLeave} disabled={leaveList.isPending}>
-                <LogOut className="h-4 w-4" />Leave list
+                <LogOut className="h-4 w-4" />{t.lists.leaveList}
               </Button>
             )}
           </div>
@@ -292,8 +303,8 @@ function ListDetail() {
       {items.length === 0 ? (
         <div className="grid place-items-center rounded-xl border border-dashed border-border py-20 text-center">
           <ListChecks className="mb-3 h-8 w-8 text-muted-foreground" />
-          <div className="font-medium">This list is empty</div>
-          <div className="text-sm text-muted-foreground">Add comics to it from any comic's detail page.</div>
+          <div className="font-medium">{t.lists.emptyListTitle}</div>
+          <div className="text-sm text-muted-foreground">{t.lists.emptyListDescription}</div>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
@@ -304,8 +315,9 @@ function ListDetail() {
                 <button
                   type="button"
                   onClick={() => handleRemove(issueId)}
-                  title="Remove from list"
-                  className="absolute -right-2 -top-2 z-10 hidden h-6 w-6 items-center justify-center rounded-full bg-destructive text-white shadow-lg group-hover:flex"
+                  title={t.lists.removeFromList(comic.series, comic.issue)}
+                  aria-label={t.lists.removeFromList(comic.series, comic.issue)}
+                  className="absolute -right-2 -top-2 z-10 hidden h-6 w-6 items-center justify-center rounded-full bg-destructive text-white shadow-lg group-hover:flex group-focus-within:flex"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -318,25 +330,29 @@ function ListDetail() {
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit list</DialogTitle>
+            <DialogTitle>{t.lists.editListTitle}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
+              <Label htmlFor="edit-list-name">{t.lists.nameLabel}</Label>
+              <Input id="edit-list-name" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div>
-              <Label>Description</Label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+              <Label htmlFor="edit-list-description">{t.lists.descriptionLabel}</Label>
+              <Textarea
+                id="edit-list-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
             </div>
             <div className="flex items-center justify-between">
-              <Label>Public</Label>
-              <Switch checked={isPublic} onCheckedChange={setIsPublic} />
+              <Label htmlFor="edit-list-public">{t.lists.publicLabel}</Label>
+              <Switch id="edit-list-public" checked={isPublic} onCheckedChange={setIsPublic} />
             </div>
           </div>
           <DialogFooter>
             <Button onClick={handleSaveEdit} disabled={updateList.isPending}>
-              {updateList.isPending ? "Saving…" : "Save"}
+              {updateList.isPending ? t.lists.saving : t.lists.save}
             </Button>
           </DialogFooter>
         </DialogContent>

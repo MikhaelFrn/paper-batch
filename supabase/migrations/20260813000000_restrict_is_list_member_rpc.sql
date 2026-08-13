@@ -1,0 +1,24 @@
+-- is_list_member is a SECURITY DEFINER helper meant only for internal use
+-- inside lists/list_items/list_members' own RLS policies (checking "is the
+-- current caller a member of this list") — but Postgres grants EXECUTE to
+-- PUBLIC by default on function creation, and PostgREST exposes every
+-- public-schema function as an RPC endpoint unless revoked. Confirmed
+-- live: `POST /rest/v1/rpc/is_list_member` was callable with **no
+-- authentication at all** and arbitrary {p_list_id, p_user_id} — leaking
+-- "is user X a member of list Y" for any pair of UUIDs to anyone.
+--
+-- Severity is low (boolean-only, no row content, both params are
+-- non-guessable UUIDs) but it's still an unauthenticated info-disclosure
+-- path that has no reason to exist.
+--
+-- Can't just revoke EXECUTE entirely: Postgres requires the querying
+-- role to hold EXECUTE on a function even when it's only invoked
+-- indirectly through an RLS policy expression (SECURITY DEFINER changes
+-- what the function body can read once running, not whether the caller
+-- is allowed to invoke it at all) — revoking from `authenticated` would
+-- break viewing a list you're a member of (not owner) app-wide. So: drop
+-- the default PUBLIC grant (which is what anon rides on), then restore
+-- it explicitly for `authenticated` only, matching what the app's own
+-- RLS policies actually need.
+REVOKE EXECUTE ON FUNCTION public.is_list_member(uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_list_member(uuid, uuid) TO authenticated;

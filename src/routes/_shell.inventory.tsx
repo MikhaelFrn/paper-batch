@@ -22,6 +22,7 @@ import { useSeriesList } from "@/hooks/useSeries";
 import { useFavoriteCreators, useFavoritePublishers, useFavoriteSeries } from "@/hooks/useFavorites";
 import { userComicToComic } from "@/lib/comic-adapters";
 import { isFavoriteIssue } from "@/lib/favorite-match";
+import { useTranslation } from "@/i18n";
 
 export const Route = createFileRoute("/_shell/inventory")({
   head: () => ({
@@ -43,6 +44,7 @@ type Sort = "recent" | "publisher" | "release" | "alpha";
 // table (small/regional imprints, foreign reprint editions like "Panini
 // Verlag" or "Marvel UK/Panini UK") gets grouped under one "Others" filter
 // option instead of cluttering the list with a checkbox per imprint.
+// Publisher names themselves are proper nouns — never translated.
 const MAIN_PUBLISHERS = [
   "Marvel",
   "DC Comics",
@@ -52,7 +54,12 @@ const MAIN_PUBLISHERS = [
   "IDW Publishing",
   "DMG/Valiant Entertainment",
 ];
-const OTHERS_LABEL = "Others";
+// Stable internal sentinel — never displayed directly, never translated.
+// Keeping this separate from the translated display label means a filter
+// selection survives a language switch instead of silently breaking (the
+// displayed "Others"/"Autres" text changes with locale, but the value
+// `pubs` actually stores and compares against doesn't).
+const OTHERS_VALUE = "__others__";
 
 function Filters({ publisherNames, seriesNames, pubs, setPubs, seriesSel, setSeriesSel, readOnly, setReadOnly, ownedOnly, setOwnedOnly, wishlistOnly, setWishlistOnly, favoritesOnly, setFavoritesOnly }: {
   publisherNames: string[];
@@ -64,21 +71,22 @@ function Filters({ publisherNames, seriesNames, pubs, setPubs, seriesSel, setSer
   wishlistOnly: boolean; setWishlistOnly: (v: boolean) => void;
   favoritesOnly: boolean; setFavoritesOnly: (v: boolean) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-6 text-sm">
       <div>
-        <Label className="text-xs uppercase tracking-widest text-muted-foreground">Publisher</Label>
+        <Label className="text-xs uppercase tracking-widest text-muted-foreground">{t.inventory.publisher}</Label>
         <div className="mt-2 space-y-2">
           {publisherNames.map((p) => (
             <label key={p} className="flex items-center gap-2">
               <Checkbox checked={pubs.includes(p)} onCheckedChange={(v) => setPubs(v ? [...pubs, p] : pubs.filter((x) => x !== p))} />
-              <PublisherBadge publisher={p} />
+              {p === OTHERS_VALUE ? <span>{t.common.others}</span> : <PublisherBadge publisher={p} />}
             </label>
           ))}
         </div>
       </div>
       <div>
-        <Label className="text-xs uppercase tracking-widest text-muted-foreground">Series</Label>
+        <Label className="text-xs uppercase tracking-widest text-muted-foreground">{t.inventory.series}</Label>
         <div className="mt-2 max-h-40 space-y-1.5 overflow-auto pr-1">
           {seriesNames.map((s) => (
             <label key={s} className="flex items-center gap-2">
@@ -89,14 +97,14 @@ function Filters({ publisherNames, seriesNames, pubs, setPubs, seriesSel, setSer
         </div>
       </div>
       <div>
-        <Label className="text-xs uppercase tracking-widest text-muted-foreground">Status</Label>
+        <Label className="text-xs uppercase tracking-widest text-muted-foreground">{t.inventory.status}</Label>
         <div className="mt-2 space-y-2">
-          <label className="flex items-center gap-2"><Checkbox checked={ownedOnly} onCheckedChange={(v) => setOwnedOnly(!!v)} /> Owned</label>
-          <label className="flex items-center gap-2"><Checkbox checked={readOnly} onCheckedChange={(v) => setReadOnly(!!v)} /> Read</label>
-          <label className="flex items-center gap-2"><Checkbox checked={wishlistOnly} onCheckedChange={(v) => setWishlistOnly(!!v)} /> Wishlist</label>
+          <label className="flex items-center gap-2"><Checkbox checked={ownedOnly} onCheckedChange={(v) => setOwnedOnly(!!v)} /> {t.inventory.owned}</label>
+          <label className="flex items-center gap-2"><Checkbox checked={readOnly} onCheckedChange={(v) => setReadOnly(!!v)} /> {t.inventory.read}</label>
+          <label className="flex items-center gap-2"><Checkbox checked={wishlistOnly} onCheckedChange={(v) => setWishlistOnly(!!v)} /> {t.inventory.wishlist}</label>
           <label className="flex items-center gap-2">
             <Checkbox checked={favoritesOnly} onCheckedChange={(v) => setFavoritesOnly(!!v)} />
-            Favorites
+            {t.inventory.favorites}
           </label>
         </div>
       </div>
@@ -105,6 +113,7 @@ function Filters({ publisherNames, seriesNames, pubs, setPubs, seriesSel, setSer
 }
 
 function Inventory() {
+  const { t } = useTranslation();
   const [pubs, setPubs] = useState<string[]>([]);
   const [seriesSel, setSeriesSel] = useState<string[]>([]);
   const [ownedOnly, setOwnedOnly] = useState(false);
@@ -126,7 +135,7 @@ function Inventory() {
     const allNames = (publishers.data ?? []).map((p) => p.name);
     const mainPresent = MAIN_PUBLISHERS.filter((name) => allNames.includes(name));
     const hasOthers = allNames.some((name) => !MAIN_PUBLISHERS.includes(name));
-    return hasOthers ? [...mainPresent, OTHERS_LABEL] : mainPresent;
+    return hasOthers ? [...mainPresent, OTHERS_VALUE] : mainPresent;
   }, [publishers.data]);
   const seriesNames = useMemo(() => (seriesList.data ?? []).map((s) => s.name), [seriesList.data]);
 
@@ -163,7 +172,7 @@ function Inventory() {
     let list = allComics.slice();
     if (favoritesOnly) list = list.filter((c) => favoriteComicIds.has(c.id));
     if (pubs.length) {
-      const othersSelected = pubs.includes(OTHERS_LABEL);
+      const othersSelected = pubs.includes(OTHERS_VALUE);
       list = list.filter(
         (c) => pubs.includes(c.publisher) || (othersSelected && !MAIN_PUBLISHERS.includes(c.publisher)),
       );
@@ -214,31 +223,49 @@ function Inventory() {
   return (
     <div>
       <PageHeader
-        eyebrow="Your Comic Vault"
-        title="Inventory"
-        description={`${filtered.length} of ${allComics.length} issues`}
+        eyebrow={t.inventory.eyebrow}
+        title={t.inventory.title}
+        description={t.inventory.issuesOf(filtered.length, allComics.length)}
         actions={
           <>
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="lg:hidden"><Filter className="h-4 w-4" />Filters</Button>
+                <Button variant="outline" size="sm" className="lg:hidden"><Filter className="h-4 w-4" />{t.inventory.filters}</Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-80">
-                <SheetHeader><SheetTitle>Filters</SheetTitle></SheetHeader>
+                <SheetHeader><SheetTitle>{t.inventory.filters}</SheetTitle></SheetHeader>
                 <div className="mt-4"><Filters {...filterProps} /></div>
               </SheetContent>
             </Sheet>
             <div className="hidden items-center gap-1 rounded-md border border-border p-0.5 sm:flex">
-              <Button size="icon" variant={view === "grid" ? "secondary" : "ghost"} className="h-8 w-8" onClick={() => setView("grid")}><LayoutGrid className="h-4 w-4" /></Button>
-              <Button size="icon" variant={view === "list" ? "secondary" : "ghost"} className="h-8 w-8" onClick={() => setView("list")}><ListIcon className="h-4 w-4" /></Button>
+              <Button
+                size="icon"
+                variant={view === "grid" ? "secondary" : "ghost"}
+                className="h-8 w-8"
+                aria-label={t.inventory.gridView}
+                aria-pressed={view === "grid"}
+                onClick={() => setView("grid")}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant={view === "list" ? "secondary" : "ghost"}
+                className="h-8 w-8"
+                aria-label={t.inventory.listView}
+                aria-pressed={view === "list"}
+                onClick={() => setView("list")}
+              >
+                <ListIcon className="h-4 w-4" />
+              </Button>
             </div>
             <Select value={sort} onValueChange={(v) => setSort(v as Sort)}>
-              <SelectTrigger className="w-[170px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-[170px]" aria-label={t.inventory.sortBy}><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="recent">Recently added</SelectItem>
-                <SelectItem value="release">Release date</SelectItem>
-                <SelectItem value="alpha">Alphabetical</SelectItem>
-                <SelectItem value="publisher">Publisher</SelectItem>
+                <SelectItem value="recent">{t.inventory.sortRecent}</SelectItem>
+                <SelectItem value="release">{t.inventory.sortRelease}</SelectItem>
+                <SelectItem value="alpha">{t.inventory.sortAlpha}</SelectItem>
+                <SelectItem value="publisher">{t.inventory.sortPublisher}</SelectItem>
               </SelectContent>
             </Select>
           </>
@@ -254,10 +281,16 @@ function Inventory() {
           </Card>
         </aside>
         <div>
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Quick filter within your collection…" className="mb-4 max-w-md" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={t.inventory.quickFilterPlaceholder}
+            aria-label={t.inventory.quickFilterPlaceholder}
+            className="mb-4 max-w-md"
+          />
 
           {collection.isLoading ? (
-            <div className="py-10 text-sm text-muted-foreground">Loading your collection…</div>
+            <div className="py-10 text-sm text-muted-foreground">{t.inventory.loadingCollection}</div>
           ) : view === "grid" ? (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
               {filtered.map((c) => <ComicCard key={c.id} comic={c} />)}
@@ -267,11 +300,11 @@ function Inventory() {
               <table className="w-full text-sm">
                 <thead className="bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <tr>
-                    <th className="p-3">Title</th>
-                    <th className="p-3">Publisher</th>
-                    <th className="p-3">Writer</th>
-                    <th className="p-3">Released</th>
-                    <th className="p-3">Status</th>
+                    <th className="p-3">{t.inventory.columnTitle}</th>
+                    <th className="p-3">{t.inventory.columnPublisher}</th>
+                    <th className="p-3">{t.inventory.columnWriter}</th>
+                    <th className="p-3">{t.inventory.columnReleased}</th>
+                    <th className="p-3">{t.inventory.columnStatus}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -282,9 +315,9 @@ function Inventory() {
                       <td className="p-3 text-muted-foreground">{c.writers[0]}</td>
                       <td className="p-3 text-muted-foreground">{new Date(c.releaseDate).toLocaleDateString()}</td>
                       <td className="p-3 text-xs">
-                        {c.owned && <span className="mr-1 rounded bg-emerald-500/15 px-1.5 py-0.5 text-emerald-400">Owned</span>}
-                        {c.read && <span className="mr-1 rounded bg-accent/15 px-1.5 py-0.5 text-accent">Read</span>}
-                        {c.wishlist && <span className="mr-1 rounded bg-gold/15 px-1.5 py-0.5 text-gold">Wishlist</span>}
+                        {c.owned && <span className="mr-1 rounded bg-emerald-500/15 px-1.5 py-0.5 text-emerald-400">{t.inventory.owned}</span>}
+                        {c.read && <span className="mr-1 rounded bg-accent/15 px-1.5 py-0.5 text-accent">{t.inventory.read}</span>}
+                        {c.wishlist && <span className="mr-1 rounded bg-gold/15 px-1.5 py-0.5 text-gold">{t.inventory.wishlist}</span>}
                       </td>
                     </tr>
                   ))}
