@@ -425,6 +425,7 @@ export const fr: typeof en = {
     delete: "Supprimer",
     deleteListTitle: (name) => `Supprimer « ${name} »?`,
     deleteListDescription: "Ceci supprime la liste et ses éléments. Cette action est irréversible.",
+    defaultListCantDelete: "Votre liste de souhaits ou de lecture par défaut ne peut pas être supprimée.",
     leaveList: "Quitter la liste",
     customList: "Liste personnalisée",
     wishlistType: "Liste de souhaits",

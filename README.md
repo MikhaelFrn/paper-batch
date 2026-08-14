@@ -44,5 +44,6 @@ build), `npm run lint`, `npm run format`.
 - React
 - Tailwind CSS
 - Supabase
+- Claude Code
 
 Deployed on Vercel

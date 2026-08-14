@@ -6,6 +6,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5";
   };
+  graphql_public: {
+    Tables: {
+      [_ in never]: never;
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json;
+          operationName?: string;
+          query?: string;
+          variables?: Json;
+        };
+        Returns: Json;
+      };
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
+  };
   public: {
     Tables: {
       app_counters: {
@@ -368,6 +393,7 @@ export type Database = {
           created_at: string | null;
           description: string | null;
           id: string;
+          is_default: boolean;
           name: string;
           owner_id: string;
           type: Database["public"]["Enums"]["list_type"];
@@ -377,6 +403,7 @@ export type Database = {
           created_at?: string | null;
           description?: string | null;
           id?: string;
+          is_default?: boolean;
           name: string;
           owner_id: string;
           type?: Database["public"]["Enums"]["list_type"];
@@ -386,6 +413,7 @@ export type Database = {
           created_at?: string | null;
           description?: string | null;
           id?: string;
+          is_default?: boolean;
           name?: string;
           owner_id?: string;
           type?: Database["public"]["Enums"]["list_type"];
@@ -394,11 +422,6 @@ export type Database = {
         Relationships: [];
       };
       profiles: {
-        // avatar_object_key hand-added ahead of the migration being
-        // applied — regenerate via `supabase gen types` once
-        // 20260815000000_decouple_avatar_filename_from_user_id.sql has run,
-        // and this entry should come out identical (delete this comment
-        // once confirmed).
         Row: {
           avatar_object_key: string | null;
           avatar_url: string | null;
@@ -585,10 +608,6 @@ export type Database = {
           },
         ];
       };
-      // Hand-added ahead of the migration being applied — regenerate via
-      // `supabase gen types` once `20260814000000_add_run_verifications.sql`
-      // has run, and this entry should come out identical (delete this
-      // comment once confirmed).
       run_verifications: {
         Row: {
           run_id: string;
@@ -952,6 +971,9 @@ export type CompositeTypes<
     : never;
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       list_role: ["owner", "editor", "viewer"],

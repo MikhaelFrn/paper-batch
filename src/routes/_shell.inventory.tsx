@@ -22,6 +22,7 @@ import { useSeriesList } from "@/hooks/useSeries";
 import { useFavoriteCreators, useFavoritePublishers, useFavoriteSeries } from "@/hooks/useFavorites";
 import { userComicToComic } from "@/lib/comic-adapters";
 import { isFavoriteIssue } from "@/lib/favorite-match";
+import { MAIN_PUBLISHER_NAMES } from "@/lib/publishers";
 import { useTranslation } from "@/i18n";
 
 export const Route = createFileRoute("/_shell/inventory")({
@@ -38,22 +39,15 @@ export const Route = createFileRoute("/_shell/inventory")({
 
 type Sort = "recent" | "publisher" | "release" | "alpha";
 
-// Curated allowlist of major publishers, each verified against ComicVine's
-// own `/publisher/` endpoint (not guessed) so a future import actually
-// matches these strings exactly. Everything else in the local `publishers`
-// table (small/regional imprints, foreign reprint editions like "Panini
-// Verlag" or "Marvel UK/Panini UK") gets grouped under one "Others" filter
-// option instead of cluttering the list with a checkbox per imprint.
-// Publisher names themselves are proper nouns — never translated.
-const MAIN_PUBLISHERS = [
-  "Marvel",
-  "DC Comics",
-  "Image",
-  "Dark Horse Comics",
-  "Boom! Studios",
-  "IDW Publishing",
-  "DMG/Valiant Entertainment",
-];
+// MAIN_PUBLISHER_NAMES (lib/publishers.ts) — everything else in the local
+// `publishers` table (small/regional imprints, foreign reprint editions
+// like "Panini Verlag") gets grouped under one "Others" filter option
+// instead of cluttering the list with a checkbox per imprint.
+// Publisher names themselves are proper nouns — never translated. Widened
+// to plain strings here (rather than kept as MainPublisherName) since this
+// list is used for membership checks against arbitrary publisher names
+// from the DB, not as a Record needing per-key exhaustiveness.
+const MAIN_PUBLISHERS: readonly string[] = MAIN_PUBLISHER_NAMES;
 // Stable internal sentinel — never displayed directly, never translated.
 // Keeping this separate from the translated display label means a filter
 // selection survives a language switch instead of silently breaking (the

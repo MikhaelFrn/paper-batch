@@ -293,23 +293,29 @@ function ListDetail() {
             {isOwner && (
               <>
                 <Button variant="outline" size="sm" onClick={openEdit}><Pencil className="h-4 w-4" />{t.lists.edit}</Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="sm"><Trash2 className="h-4 w-4" />{t.lists.delete}</Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>{t.lists.deleteListTitle(data.name)}</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        {t.lists.deleteListDescription}
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleDelete}>{t.lists.delete}</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                {!data.is_default ? (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" size="sm"><Trash2 className="h-4 w-4" />{t.lists.delete}</Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>{t.lists.deleteListTitle(data.name)}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {t.lists.deleteListDescription}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete}>{t.lists.delete}</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                ) : (
+                  <Button variant="outline" size="sm" disabled title={t.lists.defaultListCantDelete}>
+                    <Trash2 className="h-4 w-4" />{t.lists.delete}
+                  </Button>
+                )}
               </>
             )}
             {!isOwner && isMember && (

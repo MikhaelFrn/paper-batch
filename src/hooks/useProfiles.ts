@@ -5,7 +5,6 @@ import {
   getProfile,
   searchProfilesByUsername,
   updateMyProfile,
-  upsertMyProfile,
 } from "@/services/profiles";
 import { uploadMyAvatar } from "@/services/avatars";
 import { queryKeys } from "./queryKeys";
@@ -52,17 +51,6 @@ export function useUploadMyAvatar() {
       const { url, objectKey } = await uploadMyAvatar(file);
       return updateMyProfile({ avatar_url: url, avatar_object_key: objectKey });
     },
-    onSuccess: (profile) => {
-      qc.invalidateQueries({ queryKey: queryKeys.profiles.me() });
-      qc.invalidateQueries({ queryKey: queryKeys.profiles.detail(profile.id) });
-    },
-  });
-}
-
-export function useUpsertMyProfile() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (patch: ProfileUpdate) => upsertMyProfile(patch),
     onSuccess: (profile) => {
       qc.invalidateQueries({ queryKey: queryKeys.profiles.me() });
       qc.invalidateQueries({ queryKey: queryKeys.profiles.detail(profile.id) });

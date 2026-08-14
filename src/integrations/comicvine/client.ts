@@ -3,6 +3,7 @@
 // requests anyway.
 import { ServiceError } from "@/lib/types";
 import { COMICVINE_RATE_LIMIT_MESSAGE } from "@/lib/rate-limit-messages";
+import type { MainPublisherName } from "@/lib/publishers";
 import type {
   CvIssueDetail,
   CvSearchIssue,
@@ -360,14 +361,11 @@ export async function getVolumeDetail(
 // denylist, this needs an allowlist of publishers to be worth showing at
 // all. IDs resolved via /publishers/?filter=name:X against the live API,
 // not guessed.
-// Names are ComicVine's actual canonical publisher names (each verified
-// live against /publisher/{id}), matching PublisherBadge / publisherAccent's
-// keys (comic-adapters.ts) — previously used shorthand ("DC", "Dark
-// Horse", "Boom Studios", "IDW", "Valiant") that matched neither CV's own
-// name nor what upsertPublisher stores locally, so the same real-world
-// publisher displayed under two different names depending on whether a
-// comic came from New Arrivals or was actually imported.
-export const NEW_ARRIVALS_PUBLISHERS: Record<string, number> = {
+// Keys are MainPublisherName (lib/publishers.ts) plus "Red 5 Comics", the
+// one publisher New Arrivals allowlists that isn't one of the "main" 7
+// used for accent/badge styling elsewhere — each id resolved live against
+// /publisher/{id}, not guessed.
+export const NEW_ARRIVALS_PUBLISHERS: Record<MainPublisherName | "Red 5 Comics", number> = {
   Marvel: 31,
   "DC Comics": 10,
   Image: 513,

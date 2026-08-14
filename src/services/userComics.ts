@@ -139,15 +139,3 @@ export async function bulkSetOwned(issueIds: string[], owned: boolean): Promise<
 export async function bulkSetRead(issueIds: string[], read: boolean): Promise<void> {
   return bulkSetUserComicField(issueIds, "read", read);
 }
-
-export async function deleteMyUserComic(issueId: string): Promise<void> {
-  const uid = await requireUserId();
-  const { error } = await supabase
-    .from("user_comics")
-    .delete()
-    .eq("user_id", uid)
-    .eq("issue_id", issueId);
-  if (error) {
-    throw new Error(error.message);
-  }
-}

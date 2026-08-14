@@ -3,7 +3,6 @@ import type { UserCollectionEntry, UserComic } from "@/lib/types";
 import {
   bulkSetOwned,
   bulkSetRead,
-  deleteMyUserComic,
   getMyUserComicByIssue,
   listMyCollection,
   upsertMyUserComic,
@@ -63,19 +62,6 @@ export function useBulkSetRead() {
       for (const issueId of vars.issueIds) {
         qc.invalidateQueries({ queryKey: queryKeys.userComics.byIssue(issueId) });
       }
-    },
-  });
-}
-
-export function useDeleteMyUserComic() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (issueId: string) => deleteMyUserComic(issueId),
-    onSuccess: (_data, issueId) => {
-      qc.invalidateQueries({ queryKey: queryKeys.userComics.collection() });
-      qc.invalidateQueries({
-        queryKey: queryKeys.userComics.byIssue(issueId),
-      });
     },
   });
 }

@@ -420,6 +420,7 @@ export const en = {
     delete: "Delete",
     deleteListTitle: (name: string) => `Delete "${name}"?`,
     deleteListDescription: "This removes the list and its items. This can't be undone.",
+    defaultListCantDelete: "Your default wishlist/reading list can't be deleted.",
     leaveList: "Leave list",
     customList: "Custom list",
     wishlistType: "Wishlist",

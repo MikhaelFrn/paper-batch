@@ -6,14 +6,9 @@
 // `Publisher`, ComicVine search results) into it, so components don't need
 // per-source variants.
 
-import type {
-  Creator,
-  IssueCreator,
-  IssueWithRelations,
-  Publisher as PublisherRow,
-  UserComic,
-} from "./types";
+import type { Creator, IssueCreator, IssueWithRelations, UserComic } from "./types";
 import type { CvSearchIssue } from "@/integrations/comicvine/types";
+import type { MainPublisherName } from "./publishers";
 
 // ---------- UI-facing types (component API — do not change shape) ----------
 
@@ -66,13 +61,10 @@ export interface CustomList {
 
 // ---------- Publisher visual tokens ----------
 
-// Keys are ComicVine's actual canonical publisher names (verified live
-// against the real API, not guessed) — matching what upsertPublisher
-// stores for every locally-imported comic. Previously used shorthand
-// ("DC", "Dark Horse", "Boom Studios", "IDW", "Valiant") that only
-// matched New Arrivals' own shorthand map, not anything actually in the
-// DB, so most publisher badges outside New Arrivals rendered unstyled.
-export const publisherAccent: Record<string, string> = {
+// Keyed by MainPublisherName (lib/publishers.ts) rather than a plain
+// string so an added/renamed publisher there is a compile error here
+// until this map is updated too — see that file for why.
+export const publisherAccent: Record<MainPublisherName, string> = {
   Marvel: "var(--gradient-marvel)",
   "DC Comics": "var(--gradient-dc)",
   Image: "var(--gradient-image)",
@@ -83,7 +75,8 @@ export const publisherAccent: Record<string, string> = {
 };
 
 export function getPublisherAccent(publisher: string | null | undefined): string {
-  if (publisher && publisherAccent[publisher]) return publisherAccent[publisher];
+  const accent = publisher && publisherAccent[publisher as MainPublisherName];
+  if (accent) return accent;
   return "linear-gradient(135deg, oklch(0.35 0.05 260), oklch(0.20 0.05 260))";
 }
 
@@ -195,10 +188,6 @@ export function userComicToComic(
     read: entry.read ?? false,
     rating: entry.rating,
   });
-}
-
-export function publisherToComic(p: PublisherRow): Publisher {
-  return p.name;
 }
 
 /** A ComicVine search result not yet imported into the catalog. Publisher

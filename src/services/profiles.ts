@@ -46,15 +46,3 @@ export async function updateMyProfile(patch: ProfileUpdate): Promise<Profile> {
     "Failed to update profile",
   );
 }
-
-export async function upsertMyProfile(patch: ProfileUpdate): Promise<Profile> {
-  const uid = await requireUserId();
-  return unwrap(
-    await supabase
-      .from("profiles")
-      .upsert({ ...patch, id: uid, updated_at: new Date().toISOString() })
-      .select("*")
-      .single(),
-    "Failed to upsert profile",
-  );
-}

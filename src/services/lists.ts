@@ -88,7 +88,15 @@ export interface CreateListInput {
   visibility?: ListInsert["visibility"];
 }
 
-export async function createList(input: CreateListInput): Promise<ListRow> {
+/** `isDefault` is intentionally not part of CreateListInput — that type is
+ * the public shape the new-list dialog submits, and a user picking "type:
+ * wishlist" there is creating an extra wishlist-type list, not *the*
+ * auto-spawned default (see getOrCreateDefaultList). Only that function
+ * passes isDefault: true. */
+export async function createList(
+  input: CreateListInput,
+  opts: { isDefault?: boolean } = {},
+): Promise<ListRow> {
   const uid = await requireUserId();
   const list = await unwrap<ListRow>(
     await supabase
@@ -99,6 +107,7 @@ export async function createList(input: CreateListInput): Promise<ListRow> {
         description: input.description ?? null,
         type: input.type ?? "custom",
         visibility: input.visibility ?? "private",
+        is_default: opts.isDefault ?? false,
       })
       .select("*")
       .single(),
@@ -132,7 +141,23 @@ export async function updateList(
   );
 }
 
+/** Only the one list getOrCreateDefaultList auto-spawns per user (marked
+ * is_default there) is protected — a user is free to create and delete as
+ * many other wishlist/reading-*type* lists as they want via the regular
+ * new-list dialog; type alone doesn't mean "the default". Deleting the
+ * true default doesn't actually free the user from it either way, since
+ * the next "add to wishlist" silently recreates an empty one under the
+ * same name, quietly losing whatever was in it — blocked here (not just
+ * hidden in the UI) so a direct API call can't bypass it. */
 export async function deleteList(id: string): Promise<void> {
+  const list = await unwrapMaybe(
+    await supabase.from("lists").select("is_default").eq("id", id).maybeSingle(),
+    "Failed to load list",
+  ) as Pick<ListRow, "is_default"> | null;
+  if (list?.is_default) {
+    throw new Error("Your default wishlist/reading list can't be deleted.");
+  }
+
   const { error } = await supabase.from("lists").delete().eq("id", id);
   if (error) throw new Error(error.message);
 }
@@ -142,9 +167,12 @@ const DEFAULT_LIST_NAMES: Record<"wishlist" | "reading", string> = {
   reading: "Reading List",
 };
 
-/** Every user has at most one "wishlist" and one "reading" list — created
- * lazily on first use so actions like "add to wishlist" always have
- * somewhere to go without the user pre-creating it. */
+/** Every user has at most one auto-spawned "wishlist" and one "reading"
+ * list (is_default: true) — created lazily on first use so actions like
+ * "add to wishlist" always have somewhere to go without the user
+ * pre-creating it. Looked up by is_default, not type alone: the user can
+ * separately create any number of their own wishlist/reading-type lists
+ * via the new-list dialog, and those must never be mistaken for this one. */
 export async function getOrCreateDefaultList(
   type: "wishlist" | "reading",
 ): Promise<ListRow> {
@@ -155,12 +183,13 @@ export async function getOrCreateDefaultList(
       .select("*")
       .eq("owner_id", uid)
       .eq("type", type)
+      .eq("is_default", true)
       .maybeSingle(),
     "Failed to load list",
   );
   if (existing) return existing;
 
-  return createList({ name: DEFAULT_LIST_NAMES[type], type });
+  return createList({ name: DEFAULT_LIST_NAMES[type], type }, { isDefault: true });
 }
 
 export async function addIssueToList(

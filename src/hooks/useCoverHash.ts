@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { backfillCoverHashes, findCoverMatches } from "@/services/coverHash";
+import { findCoverMatches } from "@/services/coverHash";
 
 export function useFindCoverMatches() {
   return useMutation({
@@ -8,11 +8,5 @@ export function useFindCoverMatches() {
       formData.append("image", file);
       return findCoverMatches({ data: formData });
     },
-  });
-}
-
-export function useBackfillCoverHashes() {
-  return useMutation({
-    mutationFn: () => backfillCoverHashes(),
   });
 }

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { ComicCover } from "./comic-cover";
 import { Badge } from "@/components/ui/badge";
 import type { Comic } from "@/lib/comic-adapters";
+import type { MainPublisherName } from "@/lib/publishers";
 import { cn } from "@/lib/utils";
 import { getKnownSafeErrorKind } from "@/lib/rate-limit-messages";
 import { useImportComicVineIssue } from "@/hooks/useComicVine";
@@ -156,11 +157,10 @@ export function ComicCard({
 }
 
 export function PublisherBadge({ publisher }: { publisher: Comic["publisher"] }) {
-  // Keys are ComicVine's actual canonical publisher names — see
-  // publisherAccent (comic-adapters.ts) for why this isn't shorthand.
-  // Deliberately never translated: these are proper nouns/brand names,
-  // not UI copy.
-  const cls: Record<string, string> = {
+  // Keyed by MainPublisherName (lib/publishers.ts) — see that file for why
+  // this isn't shorthand. Deliberately never translated: these are proper
+  // nouns/brand names, not UI copy.
+  const cls: Record<MainPublisherName, string> = {
     Marvel: "bg-primary/15 text-primary border-primary/30",
     "DC Comics": "bg-accent/15 text-accent border-accent/30",
     Image: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
@@ -170,7 +170,7 @@ export function PublisherBadge({ publisher }: { publisher: Comic["publisher"] })
     "DMG/Valiant Entertainment": "bg-violet-500/15 text-violet-300 border-violet-500/30",
   };
   return (
-    <span className={cn("inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", cls[publisher])}>
+    <span className={cn("inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", cls[publisher as MainPublisherName])}>
       {publisher}
     </span>
   );
