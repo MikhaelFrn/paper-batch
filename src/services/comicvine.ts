@@ -163,10 +163,50 @@ function parseIssueNumber(n: string | null): number | null {
 
 export type ServiceClient = ReturnType<typeof getSupabaseServiceClient>;
 
+// Regional imprints ComicVine tracks as wholly different publisher records
+// ("Marvel UK", "DC Comics France") despite being the same real-world
+// publisher for collection purposes — left unaliased, each would create its
+// own row here and dodge publisherAccent/NEW_ARRIVALS_PUBLISHERS' exact-name
+// lookups (comic-adapters.ts, comicvine/client.ts), rendering unstyled.
+// Keys are padded with a leading/trailing space and matched against the
+// incoming name padded the same way, so this only ever matches a whole
+// word/phrase — "Marvel" alone would NOT also swallow an unrelated
+// publisher whose name merely contains it as a substring, e.g. a
+// hypothetical "Marvelous Studios".
+const PUBLISHER_NAME_ALIASES: Record<string, string> = {
+  " Marvel ": "Marvel",
+  " Marvel Comics ": "Marvel",
+  " DC Comics ": "DC Comics",
+  " DC ": "DC Comics",
+  " Image ": "Image",
+  " Image Comics ": "Image",
+  " Dark Horse Comics ": "Dark Horse Comics",
+  " Dark Horse ": "Dark Horse Comics",
+  " Boom! Studios ": "Boom! Studios",
+  " Boom Studios ": "Boom! Studios",
+  " IDW Publishing ": "IDW Publishing",
+  " IDW ": "IDW Publishing",
+  " DMG/Valiant Entertainment ": "DMG/Valiant Entertainment",
+  " Valiant Entertainment ": "DMG/Valiant Entertainment",
+  " Valiant ": "DMG/Valiant Entertainment",
+  " Red 5 Comics ": "Red 5 Comics",
+  " Red 5 ": "Red 5 Comics",
+};
+
+export function normalizePublisherName(name: string): string {
+  const padded = ` ${name.trim()} `;
+  for (const [needle, canonical] of Object.entries(PUBLISHER_NAME_ALIASES)) {
+    if (padded.includes(needle)) return canonical;
+  }
+  return name;
+}
+
 export async function upsertPublisher(
   supabase: ServiceClient,
   cv: CvPublisherSummary,
 ): Promise<string> {
+  const name = normalizePublisherName(cv.name);
+
   const byCvId = await supabase
     .from("publishers")
     .select("id")
@@ -177,7 +217,7 @@ export async function upsertPublisher(
   const byName = await supabase
     .from("publishers")
     .select("id, comicvine_id")
-    .eq("name", cv.name)
+    .eq("name", name)
     .maybeSingle();
   if (byName.data) {
     if (!byName.data.comicvine_id) {
@@ -196,7 +236,7 @@ export async function upsertPublisher(
   const inserted = await supabase
     .from("publishers")
     .insert({
-      name: cv.name,
+      name,
       comicvine_id: cv.id,
       api_source: "comicvine",
       synced_at: new Date().toISOString(),
@@ -208,10 +248,10 @@ export async function upsertPublisher(
   // 23505: someone else's concurrent upsert for this exact publisher won
   // the race between our two checks above and this insert — not an error
   // from this caller's point of view, just re-fetch what they created.
-  // Two separate .eq() lookups, not a combined .or() filter string — cv.name
-  // is ComicVine's own text and could contain a comma or paren, which would
-  // corrupt an .or() filter the same way search's esc() helper exists to
-  // prevent.
+  // Two separate .eq() lookups, not a combined .or() filter string — name
+  // is derived from ComicVine's own text and could contain a comma or
+  // paren, which would corrupt an .or() filter the same way search's esc()
+  // helper exists to prevent.
   if (inserted.error?.code === "23505") {
     const raceByCvId = await supabase
       .from("publishers")
@@ -223,7 +263,7 @@ export async function upsertPublisher(
     const raceByName = await supabase
       .from("publishers")
       .select("id")
-      .eq("name", cv.name)
+      .eq("name", name)
       .maybeSingle();
     if (raceByName.data) return raceByName.data.id;
   }
