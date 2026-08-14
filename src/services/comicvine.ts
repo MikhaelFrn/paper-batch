@@ -79,6 +79,12 @@ async function lookupKnownVolumePublishers(
     .select("comicvine_id, publisher:publishers(comicvine_id, name)")
     .in("comicvine_id", volumeIds);
   if (error) {
+    // The client/server boundary drops everything but .message off a
+    // thrown ServiceError (see docs/pre-launch-punch-list.md) — logging
+    // the real Postgres/PostgREST error here is the only way it's ever
+    // visible anywhere (Vercel's function logs), since the caller only
+    // ever sees "Failed to look up known volume publishers".
+    console.error("lookupKnownVolumePublishers query failed:", error);
     throw new ServiceError("Failed to look up known volume publishers", { cause: error });
   }
   const map = new Map<number, { id: number; name: string } | null>();
@@ -197,12 +203,34 @@ export async function upsertPublisher(
     })
     .select("id")
     .single();
-  if (inserted.error || !inserted.data) {
-    throw new ServiceError("Failed to create publisher", {
-      cause: inserted.error,
-    });
+  if (inserted.data) return inserted.data.id;
+
+  // 23505: someone else's concurrent upsert for this exact publisher won
+  // the race between our two checks above and this insert — not an error
+  // from this caller's point of view, just re-fetch what they created.
+  // Two separate .eq() lookups, not a combined .or() filter string — cv.name
+  // is ComicVine's own text and could contain a comma or paren, which would
+  // corrupt an .or() filter the same way search's esc() helper exists to
+  // prevent.
+  if (inserted.error?.code === "23505") {
+    const raceByCvId = await supabase
+      .from("publishers")
+      .select("id")
+      .eq("comicvine_id", cv.id)
+      .maybeSingle();
+    if (raceByCvId.data) return raceByCvId.data.id;
+
+    const raceByName = await supabase
+      .from("publishers")
+      .select("id")
+      .eq("name", cv.name)
+      .maybeSingle();
+    if (raceByName.data) return raceByName.data.id;
   }
-  return inserted.data.id;
+
+  throw new ServiceError("Failed to create publisher", {
+    cause: inserted.error,
+  });
 }
 
 export async function resolveSeries(

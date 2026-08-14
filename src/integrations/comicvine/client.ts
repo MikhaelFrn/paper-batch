@@ -424,10 +424,19 @@ export async function getRecentIssues(
   const volumeIds = [
     ...new Set(raw.map((i) => i.volume?.id).filter((id): id is number => id != null)),
   ];
-  const known =
-    lookupKnownPublishers && volumeIds.length > 0
-      ? await lookupKnownPublishers(volumeIds)
-      : new Map<number, { id: number; name: string } | null>();
+  // `lookupKnownPublishers` exists purely to cut down on live CV calls —
+  // it must never be able to take New Arrivals down if it fails. Falling
+  // back to an empty map here just means every volume falls through to
+  // the live per-volume lookup below, i.e. the same behavior this had
+  // before the local-DB short-circuit existed at all.
+  let known = new Map<number, { id: number; name: string } | null>();
+  if (lookupKnownPublishers && volumeIds.length > 0) {
+    try {
+      known = await lookupKnownPublishers(volumeIds);
+    } catch (error) {
+      console.error("lookupKnownPublishers failed, falling back to live CV lookups:", error);
+    }
+  }
 
   // Only volumes `known` doesn't recognize need a live CV call — deduped
   // by volume id (not issue) so two issues from the same unrecognized
