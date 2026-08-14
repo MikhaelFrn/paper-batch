@@ -64,6 +64,36 @@ function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Backs getRecentIssues' `lookupKnownPublishers` — one batched query
+ * against volumes already in our own catalog instead of a live CV call
+ * per volume. Most series showing up in a given week's "new arrivals"
+ * have already been imported by someone before (ongoing Marvel/DC/etc.
+ * titles repeat week to week), so this is what actually cuts New
+ * Arrivals' worst-case ~100 live CV calls down to a handful. */
+async function lookupKnownVolumePublishers(
+  client: ServiceClient,
+  volumeIds: number[],
+): Promise<Map<number, { id: number; name: string } | null>> {
+  const { data, error } = await client
+    .from("volumes")
+    .select("comicvine_id, publisher:publishers(comicvine_id, name)")
+    .in("comicvine_id", volumeIds);
+  if (error) {
+    throw new ServiceError("Failed to look up known volume publishers", { cause: error });
+  }
+  const map = new Map<number, { id: number; name: string } | null>();
+  for (const row of data) {
+    if (row.comicvine_id == null) continue;
+    map.set(
+      row.comicvine_id,
+      row.publisher?.comicvine_id != null
+        ? { id: row.publisher.comicvine_id, name: row.publisher.name }
+        : null,
+    );
+  }
+  return map;
+}
+
 /** Issues from the last week, from the allowed publisher list only — see
  * NEW_ARRIVALS_PUBLISHERS in the client for why an allowlist rather than
  * the search page's denylist. */
@@ -72,7 +102,10 @@ export const getNewArrivals = createServerFn({ method: "GET" }).handler(
     await requireAuthenticatedUser();
     const end = new Date();
     const start = new Date(end.getTime() - NEW_ARRIVALS_WINDOW_DAYS * 86_400_000);
-    return getRecentIssues(isoDate(start), isoDate(end), NEW_ARRIVALS_LIMIT);
+    const client = getSupabaseServiceClient();
+    return getRecentIssues(isoDate(start), isoDate(end), NEW_ARRIVALS_LIMIT, (volumeIds) =>
+      lookupKnownVolumePublishers(client, volumeIds),
+    );
   },
 );
 
