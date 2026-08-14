@@ -23,6 +23,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { useTranslation } from "@/i18n";
@@ -33,6 +34,13 @@ export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isActive = (url: string) => (url === "/" ? pathname === "/" : pathname.startsWith(url));
   const { t } = useTranslation();
+  // On mobile the sidebar renders as an overlay Sheet, independent of
+  // routing — nothing closes it on navigation by default, so it's left
+  // covering the newly-loaded page until the user dismisses it manually.
+  const { isMobile, setOpenMobile } = useSidebar();
+  const closeOnMobile = () => {
+    if (isMobile) setOpenMobile(false);
+  };
 
   const main = [
     { title: t.nav.dashboard, url: "/", icon: LayoutDashboard },
@@ -55,7 +63,7 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <Link to="/" className="flex items-center gap-2 px-2 py-1.5">
+        <Link to="/" className="flex items-center gap-2 px-2 py-1.5" onClick={closeOnMobile}>
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-primary shadow-lg glow-marvel">
             <Zap className="h-5 w-5 text-primary-foreground" />
           </div>
@@ -73,7 +81,7 @@ export function AppSidebar() {
               {main.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
-                    <Link to={item.url} aria-label={item.title}>
+                    <Link to={item.url} aria-label={item.title} onClick={closeOnMobile}>
                       <item.icon />
                       <span>{item.title}</span>
                     </Link>
@@ -91,7 +99,7 @@ export function AppSidebar() {
               {collections.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
-                    <Link to={item.url} aria-label={item.title}>
+                    <Link to={item.url} aria-label={item.title} onClick={closeOnMobile}>
                       <item.icon />
                       <span>{item.title}</span>
                     </Link>
@@ -109,7 +117,7 @@ export function AppSidebar() {
               {account.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
-                    <Link to={item.url} aria-label={item.title}>
+                    <Link to={item.url} aria-label={item.title} onClick={closeOnMobile}>
                       <item.icon />
                       <span>{item.title}</span>
                     </Link>

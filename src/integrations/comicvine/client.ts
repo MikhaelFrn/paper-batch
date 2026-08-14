@@ -391,13 +391,25 @@ const RECENT_ISSUE_FIELDS =
 
 /** Issues shipped in `[startDate, endDate]` (YYYY-MM-DD) from the allowed
  * publisher list, newest first, capped at `limit`. A week's worth of raw
- * results fits in ComicVine's single-page max (100), so this is one issues
- * call plus one parallel batch of volume-publisher lookups — no
- * multi-page pagination needed for a 1-week window. */
+ * results fits in ComicVine's single-page max (100) — but that also means
+ * up to 100 different volumes, each needing its own publisher lookup (CV's
+ * issue search returns no publisher field at all). Firing all 100 live
+ * against CV's own rate limit is exactly what made New Arrivals take
+ * 10-20+ seconds in practice, confirmed live.
+ *
+ * `lookupKnownPublishers`, when given, is asked first for every volume id
+ * in this batch — the caller backs it with one local-DB query, since most
+ * ongoing series showing up in "new arrivals" have already been imported
+ * by someone before. Only volumes it doesn't recognize fall through to a
+ * live per-volume CV call, same as before; with no callback at all, every
+ * volume falls through, unchanged from the original behavior. */
 export async function getRecentIssues(
   startDate: string,
   endDate: string,
   limit: number,
+  lookupKnownPublishers?: (
+    volumeIds: number[],
+  ) => Promise<Map<number, { id: number; name: string } | null>>,
 ): Promise<CvRecentIssue[]> {
   const raw = await cvGet<Array<Omit<CvSearchIssue, "resource_type">>>(
     `${BASE_URL}/issues/`,
@@ -409,11 +421,51 @@ export async function getRecentIssues(
     },
   );
 
-  const publishers = await Promise.all(
-    raw.map((issue) =>
-      issue.volume ? getVolumePublisher(issue.volume.api_detail_url) : Promise.resolve(null),
-    ),
-  );
+  const volumeIds = [
+    ...new Set(raw.map((i) => i.volume?.id).filter((id): id is number => id != null)),
+  ];
+  // `lookupKnownPublishers` exists purely to cut down on live CV calls —
+  // it must never be able to take New Arrivals down if it fails. Falling
+  // back to an empty map here just means every volume falls through to
+  // the live per-volume lookup below, i.e. the same behavior this had
+  // before the local-DB short-circuit existed at all.
+  let known = new Map<number, { id: number; name: string } | null>();
+  if (lookupKnownPublishers && volumeIds.length > 0) {
+    try {
+      known = await lookupKnownPublishers(volumeIds);
+    } catch (error) {
+      console.error("lookupKnownPublishers failed, falling back to live CV lookups:", error);
+    }
+  }
+
+  // Only volumes `known` doesn't recognize need a live CV call — deduped
+  // by volume id (not issue) so two issues from the same unrecognized
+  // volume don't pay for it twice. Batched the same way as
+  // getIssueDetailsBatch below: CV's burst-detection 420s a large
+  // parallel Promise.all here just as readily as it does for per-issue
+  // detail fetches (confirmed live for that one; this path was never
+  // given the same treatment, which is exactly what let New Arrivals fire
+  // up to 100 concurrent requests on a freshly-seeded catalog).
+  const unknownVolumes = new Map<number, string>();
+  for (const issue of raw) {
+    if (issue.volume && !known.has(issue.volume.id) && !unknownVolumes.has(issue.volume.id)) {
+      unknownVolumes.set(issue.volume.id, issue.volume.api_detail_url);
+    }
+  }
+  const unknownEntries = [...unknownVolumes.entries()];
+  const resolved = new Map<number, { id: number; name: string } | null>();
+  for (let i = 0; i < unknownEntries.length; i += CREDIT_FETCH_BATCH_SIZE) {
+    if (i > 0) await sleep(CREDIT_FETCH_BATCH_DELAY_MS);
+    const batch = unknownEntries.slice(i, i + CREDIT_FETCH_BATCH_SIZE);
+    const batchResults = await Promise.all(batch.map(([, url]) => getVolumePublisher(url)));
+    batch.forEach(([volumeId], j) => resolved.set(volumeId, batchResults[j]));
+  }
+
+  const publishers = raw.map((issue) => {
+    if (!issue.volume) return null;
+    if (known.has(issue.volume.id)) return known.get(issue.volume.id) ?? null;
+    return resolved.get(issue.volume.id) ?? null;
+  });
 
   const allowed: CvRecentIssue[] = [];
   for (let i = 0; i < raw.length; i++) {

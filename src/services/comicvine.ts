@@ -64,6 +64,42 @@ function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Backs getRecentIssues' `lookupKnownPublishers` — one batched query
+ * against volumes already in our own catalog instead of a live CV call
+ * per volume. Most series showing up in a given week's "new arrivals"
+ * have already been imported by someone before (ongoing Marvel/DC/etc.
+ * titles repeat week to week), so this is what actually cuts New
+ * Arrivals' worst-case ~100 live CV calls down to a handful. */
+async function lookupKnownVolumePublishers(
+  client: ServiceClient,
+  volumeIds: number[],
+): Promise<Map<number, { id: number; name: string } | null>> {
+  const { data, error } = await client
+    .from("volumes")
+    .select("comicvine_id, publisher:publishers(comicvine_id, name)")
+    .in("comicvine_id", volumeIds);
+  if (error) {
+    // The client/server boundary drops everything but .message off a
+    // thrown ServiceError (see docs/pre-launch-punch-list.md) — logging
+    // the real Postgres/PostgREST error here is the only way it's ever
+    // visible anywhere (Vercel's function logs), since the caller only
+    // ever sees "Failed to look up known volume publishers".
+    console.error("lookupKnownVolumePublishers query failed:", error);
+    throw new ServiceError("Failed to look up known volume publishers", { cause: error });
+  }
+  const map = new Map<number, { id: number; name: string } | null>();
+  for (const row of data) {
+    if (row.comicvine_id == null) continue;
+    map.set(
+      row.comicvine_id,
+      row.publisher?.comicvine_id != null
+        ? { id: row.publisher.comicvine_id, name: row.publisher.name }
+        : null,
+    );
+  }
+  return map;
+}
+
 /** Issues from the last week, from the allowed publisher list only — see
  * NEW_ARRIVALS_PUBLISHERS in the client for why an allowlist rather than
  * the search page's denylist. */
@@ -72,7 +108,10 @@ export const getNewArrivals = createServerFn({ method: "GET" }).handler(
     await requireAuthenticatedUser();
     const end = new Date();
     const start = new Date(end.getTime() - NEW_ARRIVALS_WINDOW_DAYS * 86_400_000);
-    return getRecentIssues(isoDate(start), isoDate(end), NEW_ARRIVALS_LIMIT);
+    const client = getSupabaseServiceClient();
+    return getRecentIssues(isoDate(start), isoDate(end), NEW_ARRIVALS_LIMIT, (volumeIds) =>
+      lookupKnownVolumePublishers(client, volumeIds),
+    );
   },
 );
 
@@ -124,10 +163,50 @@ function parseIssueNumber(n: string | null): number | null {
 
 export type ServiceClient = ReturnType<typeof getSupabaseServiceClient>;
 
+// Regional imprints ComicVine tracks as wholly different publisher records
+// ("Marvel UK", "DC Comics France") despite being the same real-world
+// publisher for collection purposes — left unaliased, each would create its
+// own row here and dodge publisherAccent/NEW_ARRIVALS_PUBLISHERS' exact-name
+// lookups (comic-adapters.ts, comicvine/client.ts), rendering unstyled.
+// Keys are padded with a leading/trailing space and matched against the
+// incoming name padded the same way, so this only ever matches a whole
+// word/phrase — "Marvel" alone would NOT also swallow an unrelated
+// publisher whose name merely contains it as a substring, e.g. a
+// hypothetical "Marvelous Studios".
+const PUBLISHER_NAME_ALIASES: Record<string, string> = {
+  " Marvel ": "Marvel",
+  " Marvel Comics ": "Marvel",
+  " DC Comics ": "DC Comics",
+  " DC ": "DC Comics",
+  " Image ": "Image",
+  " Image Comics ": "Image",
+  " Dark Horse Comics ": "Dark Horse Comics",
+  " Dark Horse ": "Dark Horse Comics",
+  " Boom! Studios ": "Boom! Studios",
+  " Boom Studios ": "Boom! Studios",
+  " IDW Publishing ": "IDW Publishing",
+  " IDW ": "IDW Publishing",
+  " DMG/Valiant Entertainment ": "DMG/Valiant Entertainment",
+  " Valiant Entertainment ": "DMG/Valiant Entertainment",
+  " Valiant ": "DMG/Valiant Entertainment",
+  " Red 5 Comics ": "Red 5 Comics",
+  " Red 5 ": "Red 5 Comics",
+};
+
+export function normalizePublisherName(name: string): string {
+  const padded = ` ${name.trim()} `;
+  for (const [needle, canonical] of Object.entries(PUBLISHER_NAME_ALIASES)) {
+    if (padded.includes(needle)) return canonical;
+  }
+  return name;
+}
+
 export async function upsertPublisher(
   supabase: ServiceClient,
   cv: CvPublisherSummary,
 ): Promise<string> {
+  const name = normalizePublisherName(cv.name);
+
   const byCvId = await supabase
     .from("publishers")
     .select("id")
@@ -138,7 +217,7 @@ export async function upsertPublisher(
   const byName = await supabase
     .from("publishers")
     .select("id, comicvine_id")
-    .eq("name", cv.name)
+    .eq("name", name)
     .maybeSingle();
   if (byName.data) {
     if (!byName.data.comicvine_id) {
@@ -157,19 +236,41 @@ export async function upsertPublisher(
   const inserted = await supabase
     .from("publishers")
     .insert({
-      name: cv.name,
+      name,
       comicvine_id: cv.id,
       api_source: "comicvine",
       synced_at: new Date().toISOString(),
     })
     .select("id")
     .single();
-  if (inserted.error || !inserted.data) {
-    throw new ServiceError("Failed to create publisher", {
-      cause: inserted.error,
-    });
+  if (inserted.data) return inserted.data.id;
+
+  // 23505: someone else's concurrent upsert for this exact publisher won
+  // the race between our two checks above and this insert — not an error
+  // from this caller's point of view, just re-fetch what they created.
+  // Two separate .eq() lookups, not a combined .or() filter string — name
+  // is derived from ComicVine's own text and could contain a comma or
+  // paren, which would corrupt an .or() filter the same way search's esc()
+  // helper exists to prevent.
+  if (inserted.error?.code === "23505") {
+    const raceByCvId = await supabase
+      .from("publishers")
+      .select("id")
+      .eq("comicvine_id", cv.id)
+      .maybeSingle();
+    if (raceByCvId.data) return raceByCvId.data.id;
+
+    const raceByName = await supabase
+      .from("publishers")
+      .select("id")
+      .eq("name", name)
+      .maybeSingle();
+    if (raceByName.data) return raceByName.data.id;
   }
-  return inserted.data.id;
+
+  throw new ServiceError("Failed to create publisher", {
+    cause: inserted.error,
+  });
 }
 
 export async function resolveSeries(
